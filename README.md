@@ -87,9 +87,7 @@ Version: 1.0.2
 
 Flow:
 
-```
-
-```
+![MDocR flow](http://www.plantuml.com/plantuml/proxy?src=https://raw.github.com/loopingz/mdocr/master/docs/flow.puml)
 
 ## Customization
 

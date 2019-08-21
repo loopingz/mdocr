@@ -1,0 +1,36 @@
+@startuml
+
+start
+
+:scan git repository;
+
+partition build {
+while (for each markdown file)
+  :analyse markdown;
+  :execute commands;
+  :generate built markdown;
+endwhile
+}
+
+partition publish {
+while (for each built markdown file)
+  :get next version based on conventional commits;
+  :update markdown metadatas;
+  :add changes to the repository;
+endwhile
+
+:commit release commit;
+while (for each built markdown file)
+ :add tag for each file myfile@1.0.0;
+endwhile
+}
+
+partition postpublish {
+while (for each built markdown file)
+  :run publishers;
+endwhile
+}
+
+stop
+
+@enduml
