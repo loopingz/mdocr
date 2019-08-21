@@ -241,7 +241,6 @@ export default class MDocsRepository {
   }
 
   async publish(preview = false, file: string = undefined) {
-    let summary = await this.git.diffSummary();
     let status = await this.git.status();
     if (status.files.filter(i => this.isIncludedInFiles(i.path)).length > 0) {
       console.log(
