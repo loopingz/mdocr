@@ -1,6 +1,6 @@
 {
   "name": "mdocs",
-  "version": "0.9.9",
+  "version": "1.0.0-alpha1",
   "description": "Manage your MD with conventional commits",
   "bin": {
     "mdocs": "./lib/mdocs.js"
