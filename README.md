@@ -1,36 +1,36 @@
-# MDocs
+# MDocr
 
-MDocs allows you to manage your documents in Markdown inside a Git repository.
+MDocr allows you to manage your documents in Markdown inside a Git repository.
 
 Use conventional commits to automate their versions.
 
 Use:
 
-* `commands`: to automate content inside your MDs
-* `postprocessors`: to automate publishing
- * pdf 
- * confluence
- * etc
+- `commands`: to automate content inside your MDs
+- `postprocessors`: to automate publishing
+- pdf
+- confluence
+- etc
 
 ## Quickstart
 
 Install
 
 ```
-npm install -g mdocs
+npm install -g mdocr
 # OR
-yarn global add mdocs
+yarn global add mdocr
 ```
 
 Usage
 
 ```
 # Build docs with their new modification
-mdocs build
+mdocr build
 # Publish docs and create a new version of each modified doc
-mdocs publish
+mdocr publish
 # Call post processors on each documents
-mdocs postpublish
+mdocr postpublish
 ```
 
 ## Built in Commands
@@ -43,6 +43,7 @@ To retrieve current document version:
 # My New Doc
 Version: <CurrentVersion />
 ```
+
 will be replace by on build
 
 ```
@@ -58,6 +59,7 @@ To retrieve display document versions:
 # My New Doc
 Version: <CurrentVersion />
 ```
+
 will be replace by on build
 
 ```
@@ -73,14 +75,13 @@ To import another MD inside your document
 # My New Doc
 Version: <CurrentVersion />
 ```
+
 will be replace by on build
 
 ```
 # My New Doc
 Version: 1.0.2
 ```
-
-
 
 ## How it works?
 
@@ -96,4 +97,4 @@ PreProcessor example
 
 ```
 
-``` 	
+```
