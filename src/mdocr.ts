@@ -13,10 +13,10 @@ import * as mkdirp from "mkdirp";
 import * as dateFormat from "dateformat";
 import * as process from "process";
 
-async function Import(cmd, ctx, mdocs) {
+async function Import(cmd, ctx, mdocr) {
   let file = path.dirname(ctx.path) + "/" + cmd.arguments.file;
   if (fs.existsSync(file)) {
-    return await mdocs.processContent(fs.readFileSync(file).toString(), ctx);
+    return await mdocr.processContent(fs.readFileSync(file).toString(), ctx);
   }
 }
 

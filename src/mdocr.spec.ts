@@ -3,7 +3,7 @@ import * as assert from "assert";
 import * as mkdirp from "mkdirp";
 import * as simpleGit from "simple-git";
 import * as doAsync from "doasync";
-import { MDocsRepository } from "./mdocs";
+import { MDocsRepository } from "./mdocr";
 import * as fs from "fs";
 import * as rimraf from "rimraf";
 
@@ -17,7 +17,7 @@ Imported: <CurrentVersion />
 @suite
 class MDocsTest {
   git: any;
-  mdocs: any;
+  mdocr: any;
 
   before() {
     if (fs.existsSync("./test/data")) {
@@ -25,7 +25,7 @@ class MDocsTest {
     }
     mkdirp.sync("./test/data");
     this.git = doAsync(simpleGit("./test/data"));
-    this.mdocs = new MDocsRepository({ rootPath: "./test/data", pdf: true });
+    this.mdocr = new MDocsRepository({ rootPath: "./test/data", pdf: true });
   }
 
   appendFile(file, str) {
@@ -112,7 +112,7 @@ Version: <CurrentVersion />
     await this.initScenario();
 
     // Add a custom command
-    this.mdocs.addCommand("Demo", (cmd, ctx, mdocs) => {
+    this.mdocr.addCommand("Demo", (cmd, ctx, mdocr) => {
       let res = cmd.childNodes.filter(i => i.nodeName === "subdemo").length;
       assert.equal(
         res,
@@ -122,11 +122,11 @@ Version: <CurrentVersion />
       return `This is my custom command, you have ${res} SubDemo nodes`;
     });
 
-    this.mdocs.addPublisher(async file => {
+    this.mdocr.addPublisher(async file => {
       console.log("Can work on", file);
     });
-    await this.mdocs.init();
-    await this.mdocs.publish();
+    await this.mdocr.init();
+    await this.mdocr.publish();
 
     // TODO Add asserts
 
@@ -141,14 +141,14 @@ Version: <CurrentVersion />
     await this.git.add("drafts/docs/test3.md");
     await this.git.commit("feature: BREAKING to major");
 
-    await this.mdocs.init();
-    await this.mdocs.publish();
+    await this.mdocr.init();
+    await this.mdocr.publish();
 
     // TODO Add asserts
     this.appendFile("./test/data/drafts/docs/test3.md", "should stash");
 
-    await this.mdocs.init();
-    await this.mdocs.publish();
+    await this.mdocr.init();
+    await this.mdocr.publish();
 
     // TODO Add asserts nothing has changed
   }

@@ -1,9 +1,9 @@
 {
-  "name": "mdocs",
+  "name": "mdocr",
   "version": "1.0.0-alpha1",
   "description": "Manage your MD with conventional commits",
   "bin": {
-    "mdocs": "./lib/mdocs.js"
+    "mdocr": "./lib/mdocr.js"
   },
   "files": [
     "lib"
@@ -11,8 +11,8 @@
   "scripts": {
     "test": "nyc mocha --recursive --exit --timeout=100000 -r ts-node/register src/**/*.spec.ts"
   },
-  "main": "lib/mdocs.js",
-  "repository": "https://github.com/loopingz/mdocs",
+  "main": "lib/mdocr.js",
+  "repository": "https://github.com/loopingz/mdocr",
   "author": "Remi Cattiau <remi@cattiau.com>",
   "license": "MIT",
   "dependencies": {
@@ -39,7 +39,7 @@
       "json"
     ]
   },
-  "homepage": "https://loopingz.github.io/mdocs",
+  "homepage": "https://loopingz.github.io/mdocr",
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^0.1.3",
     "mocha": "^6.2.0",
