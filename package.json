@@ -1,0 +1,52 @@
+{
+  "name": "mdocs",
+  "version": "0.9.9",
+  "description": "Manage your MD with conventional commits",
+  "bin": {
+    "mdocs": "./lib/mdocs.js"
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "test": "nyc mocha --recursive --exit --timeout=100000 -r ts-node/register src/**/*.spec.ts"
+  },
+  "main": "lib/mdocs.js",
+  "repository": "https://github.com/loopingz/mdocs",
+  "author": "Remi Cattiau <remi@cattiau.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^12.7.2",
+    "dateformat": "^3.0.3",
+    "doasync": "^2.0.1",
+    "glob-fs": "^0.1.7",
+    "markdown-pdf": "^10.0.0",
+    "mkdirp": "^0.5.1",
+    "parse5": "^5.1.0",
+    "remarkable-meta": "^1.0.1",
+    "remarkable-plantuml": "^1.1.0",
+    "semver": "^6.3.0",
+    "simple-git": "^1.124.0",
+    "yaml": "^1.6.0",
+    "yargs": "^14.0.0"
+  },
+  "nyc": {
+    "extends": "@istanbuljs/nyc-config-typescript",
+    "report-dir": "./reports",
+    "reporter": [
+      "html",
+      "lcov",
+      "json"
+    ]
+  },
+  "homepage": "https://loopingz.github.io/mdocs",
+  "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^0.1.3",
+    "mocha": "^6.2.0",
+    "mocha-typescript": "^1.1.17",
+    "nyc": "^14.1.1",
+    "rimraf": "^3.0.0",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
+  }
+}
