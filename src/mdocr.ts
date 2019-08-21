@@ -65,6 +65,7 @@ export default class MDocsRepository {
     VersionsTable
   };
   protected targets: any = {};
+  protected gitFiles: any = {};
   protected files: any = {};
   protected config: any = {};
   /**
@@ -121,6 +122,7 @@ export default class MDocsRepository {
     for (let i in files) {
       this.files[files[i]] = await this.analyse(files[i]);
       this.targets[this.files[files[i]].gitTarget] = files[i];
+      this.gitFiles[this.files[files[i]].gitPath] = files[i];
     }
   }
 
@@ -234,14 +236,18 @@ export default class MDocsRepository {
     };
   }
 
+  isIncludedInFiles(file) {
+    return this.gitFiles[file] !== undefined;
+  }
+
   async publish(preview = false, file: string = undefined) {
     let summary = await this.git.diffSummary();
     let status = await this.git.status();
-    if (summary.files.length > 0) {
+    if (status.files.filter(i => this.isIncludedInFiles(i.path)).length > 0) {
       console.log(
         "You need to work from a clean repository, stash your changes"
       );
-      return;
+      return false;
     }
     await this.build((...args) => {}, file);
     status = await this.git.status();
@@ -250,7 +256,6 @@ export default class MDocsRepository {
         return f.path.startsWith(this.config.buildDir);
       })
       .map(i => i.path);
-    console.log("post build", files);
     for (let i in files) {
       let src = this.getSourceFromTarget(files[i]);
       console.log("Updating", src.gitPath, "with", src.nextVersion);
@@ -278,7 +283,7 @@ export default class MDocsRepository {
       }
     }
     if (preview) {
-      return;
+      return true;
     }
     // Rebuild with new versions added
     await this.build((...args) => {}, file);
@@ -303,6 +308,7 @@ export default class MDocsRepository {
       await this.git.addTag(tags[i]);
     }
     await this.postpublish(true);
+    return true;
   }
 
   async getNextVersion(file) {
@@ -363,12 +369,11 @@ export default class MDocsRepository {
   async build(log = console.log, file: string = undefined) {
     // Get all files -> a bit dirty
     let summary = await this.git.diffSummary();
-    let updates = summary.files.filter(f => {
+    summary.files.forEach(f => {
       if (this.files[f.file]) {
         let { insertions, deletions, changes } = f;
         this.files[f.file].changes = { insertions, deletions, changes };
       }
-      return this.files[f.file] !== undefined;
     });
     for (let i in this.files) {
       if (
@@ -433,7 +438,7 @@ export default class MDocsRepository {
       })
       .demandCommand()
       .help()
-      .wrap(120).argv;
+      .wrap(120);
   }
 }
 

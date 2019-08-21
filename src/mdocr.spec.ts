@@ -100,6 +100,7 @@ Version: <CurrentVersion />
 
 <Demo>
     <SubDemo>Bouzouf</SubDemo>
+    <SubDemo>Bouzouf2</SubDemo>
 </Demo>
 `
     );
@@ -116,19 +117,26 @@ Version: <CurrentVersion />
       let res = cmd.childNodes.filter(i => i.nodeName === "subdemo").length;
       assert.equal(
         res,
-        1,
+        2,
         "The Demo command should get one subdemo child node"
       );
       return `This is my custom command, you have ${res} SubDemo nodes`;
     });
-
+    let called = [];
     this.mdocr.addPublisher(async file => {
-      console.log("Can work on", file);
+      called.push(file);
     });
     await this.mdocr.init();
     await this.mdocr.publish();
 
+    assert.equal(called.length, 3, "Should publish 3 documents");
     // TODO Add asserts
+    assert.equal(called[0].nextVersion, "1.0.0");
+    assert.equal(called[1].nextVersion, "1.1.0");
+    assert.equal(called[2].nextVersion, "1.0.0");
+    let content = fs.readFileSync("./test/data/build/docs/test.md").toString();
+    assert.notEqual(content.match(/Imported: 1\.0\.0/g), undefined);
+    assert.notEqual(content.match(/Version: 1\.0\.0/g), undefined);
 
     await this.git.commit("feature: first commit");
     this.appendFile("./test/data/drafts/docs/test.md", "patch versioned");
@@ -141,15 +149,54 @@ Version: <CurrentVersion />
     await this.git.add("drafts/docs/test3.md");
     await this.git.commit("feature: BREAKING to major");
 
+    called.splice(0, 3);
     await this.mdocr.init();
     await this.mdocr.publish();
 
-    // TODO Add asserts
+    assert.equal(called.length, 3, "Should publish 3 documents");
+
+    assert.equal(called[0].nextVersion, "1.0.1");
+    assert.equal(called[1].nextVersion, "1.2.0");
+    assert.equal(called[2].nextVersion, "2.0.0");
+
+    content = fs.readFileSync("./test/data/build/docs/test3.md").toString();
+    assert.notEqual(content.match(/Imported: 2\.0\.0/g), undefined);
+    assert.notEqual(content.match(/Version: 2\.0\.0/g), undefined);
+
+    content = fs.readFileSync("./test/data/build/docs/test2.md").toString();
+    assert.notEqual(content.match(/Imported: 1\.2\.0/g), undefined);
+    assert.notEqual(content.match(/Version: 1\.2\.0/g), undefined);
+    assert.notEqual(
+      content.match(
+        /1\.0\.0\s*|\s*2019-01-01\s*|\s*Georges Abitbol\s*|\s*|\s*Thomas A. Anderson\s*/g
+      ),
+      undefined
+    );
+  }
+
+  //@test
+  async uncommittedFiles() {
+    await this.initScenario();
+    fs.writeFileSync("./test/data/drafts/docs/plop.md", "should stash");
+    await this.mdocr.init();
+    assert.equal(
+      await this.mdocr.publish(),
+      false,
+      "Should not allow modified tree"
+    );
+    fs.unlinkSync("./test/data/drafts/docs/plop.md");
+  }
+
+  //@test
+  async uncommittedChanges() {
+    await this.initScenario();
     this.appendFile("./test/data/drafts/docs/test3.md", "should stash");
 
     await this.mdocr.init();
-    await this.mdocr.publish();
-
-    // TODO Add asserts nothing has changed
+    assert.equal(
+      await this.mdocr.publish(),
+      false,
+      "Should not allow modified tree"
+    );
   }
 }
