@@ -174,7 +174,7 @@ Version: <CurrentVersion />
     );
   }
 
-  //@test
+  @test
   async uncommittedFiles() {
     await this.initScenario();
     fs.writeFileSync("./test/data/drafts/docs/plop.md", "should stash");
@@ -187,7 +187,7 @@ Version: <CurrentVersion />
     fs.unlinkSync("./test/data/drafts/docs/plop.md");
   }
 
-  //@test
+  @test
   async uncommittedChanges() {
     await this.initScenario();
     this.appendFile("./test/data/drafts/docs/test3.md", "should stash");
@@ -198,5 +198,21 @@ Version: <CurrentVersion />
       false,
       "Should not allow modified tree"
     );
+  }
+
+  //@test
+  async buildCommandLine() {
+    // Not yet ready the chdir seems to generate issue with git spawn
+    // Build
+    await this.initScenario();
+    // Fake process
+    let cur = process.cwd();
+    let argv = process.argv;
+    process.chdir("./test/data");
+    process.argv = ["mdocr", "build"];
+    await MDocsRepository.commandLine();
+    // Reset normal process
+    process.argv = argv;
+    process.chdir(cur);
   }
 }
