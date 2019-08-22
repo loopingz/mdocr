@@ -112,11 +112,11 @@ export default class MDocsRepository {
 
   async init() {
     let files = this.config.files
-      .map(file =>
-        glob({ gitignore: true })
-          .readdirSync(file)
-          .join("|")
-      )
+      .map(file => {
+        return glob({ gitignore: true })
+          .readdirSync(path.relative(".", file))
+          .join("|");
+      })
       .join("|")
       .split("|");
     for (let i in files) {
@@ -133,6 +133,8 @@ export default class MDocsRepository {
     };
     if (filePath.startsWith(this.rootPath + "/")) {
       file.gitPath = filePath.substr(this.rootPath.length + 1);
+    } else {
+      file.gitPath = filePath;
     }
     let foundRelease = false;
     file.meta = {};
@@ -351,6 +353,25 @@ export default class MDocsRepository {
     return commits;
   }
 
+  async previewer(str, type: string = "pdf") {
+    let pdf = await new Promise(resolve => {
+      markdownpdf({
+        //preProcessHtml: preProcessMd,
+        remarkable: {
+          preset: "commonmark",
+          plugins: [require("remarkable-plantuml"), require("remarkable-meta")]
+        }
+      })
+        .from.string(str)
+        .to.buffer({}, (err, data) => {
+          resolve(data);
+        });
+    });
+    if (type === "html") {
+    }
+    return pdf;
+  }
+
   async pdf(file) {
     return new Promise(resolve => {
       markdownpdf({
@@ -403,8 +424,89 @@ export default class MDocsRepository {
     }
   }
 
+  async edit(url = "http://localhost:3000") {
+    let packageInfo = require("../package.json");
+    return new Promise(resolve => {
+      const http = require("http");
+      const server = http
+        .createServer(async (req, res) => {
+          // TODO Add referer checks
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": url
+          });
+          if (req.method === "GET") {
+            if (req.url === "/stop") {
+              res.write(JSON.stringify({ message: "Bye!" }));
+              res.end();
+              resolve();
+            } else if (req.url === "/mdocr") {
+              res.write(
+                JSON.stringify({
+                  files: this.files,
+                  version: packageInfo.version,
+                  path: this.rootPath
+                })
+              );
+            } else {
+              let match = req.url.match(/\/(\w+)\/(.*)/);
+              if (match && this.files[match[2]]) {
+                let file = this.files[match[2]];
+                if (match[1] === "drafts") {
+                  res.writeHead(200, {
+                    "Content-Type": "text/plain",
+                    "Access-Control-Allow-Origin": url
+                  });
+                  res.write(fs.readFileSync(file.absPath));
+                } else if (match[1] === "build") {
+                  res.writeHead(200, {
+                    "Content-Type": "text/plain",
+                    "Access-Control-Allow-Origin": url
+                  });
+                  res.write(await this.processFile(file));
+                } else if (match[1] === "pdf") {
+                  res.writeHead(200, {
+                    "Content-Type": "application/octet-stream",
+                    "Access-Control-Allow-Origin": url
+                  });
+                  let pdf = await this.previewer(await this.processFile(file));
+                  console.log(pdf);
+                  res.write(pdf);
+                }
+              } else {
+                res.writeHead(404);
+              }
+            }
+          } else if (req.method === "PUT") {
+            if (req.url === "/commit") {
+              /**
+              {
+                message: ""
+              }
+               */
+            } else {
+              let match = req.url.match(/\/(\w+)\/(.*)/);
+              if (match && this.files[match[2]]) {
+                let file = this.files[match[2]];
+              } else {
+                res.writeHead(404);
+              }
+            }
+          } else {
+            res.writeHead(404);
+          }
+          res.end();
+        })
+        .listen(18181);
+    });
+  }
+
   static async commandLine() {
     let drepo = new MDocsRepository();
+    if (!fs.existsSync(".git")) {
+      console.log("Should be run only in repository root");
+      return 1;
+    }
 
     require("yargs")
       .command(
@@ -435,9 +537,18 @@ export default class MDocsRepository {
           await drepo.postpublish(argv.file);
         }
       })
+      .command({
+        command: "edit",
+        builder: yargs => yargs.boolean("url"),
+        desc: "Launch the editor",
+        handler: async argv => {
+          await drepo.init();
+          await drepo.edit();
+        }
+      })
       .demandCommand()
       .help()
-      .wrap(120);
+      .wrap(120).argv;
   }
 }
 
@@ -458,7 +569,7 @@ drepo.addPublisher(async file => {
   await s3
     .putObject({
       Body: fs.readFileSync(pdfFile),
-      Bucket: "nuxeo-security",
+      Bucket: "",
       Key: pdfFile.replace(drepo.config.publishedDir, "")
     })
     .promise();
