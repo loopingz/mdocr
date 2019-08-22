@@ -354,9 +354,16 @@ export default class MDocsRepository {
   }
 
   async previewer(str, type: string = "pdf") {
+    const through = require("through");
+    let html;
     let pdf = await new Promise(resolve => {
       markdownpdf({
-        //preProcessHtml: preProcessMd,
+        preProcessHtml: () => {
+          return through(function(data) {
+            html = data.toString();
+            this.queue(data);
+          });
+        },
         remarkable: {
           preset: "commonmark",
           plugins: [require("remarkable-plantuml"), require("remarkable-meta")]
@@ -368,6 +375,7 @@ export default class MDocsRepository {
         });
     });
     if (type === "html") {
+      return html || "";
     }
     return pdf;
   }
@@ -430,6 +438,16 @@ export default class MDocsRepository {
       const http = require("http");
       const server = http
         .createServer(async (req, res) => {
+          let body = "";
+          await new Promise(resolve => {
+            req.on("data", chunk => {
+              body += chunk.toString(); // convert Buffer to string
+            });
+            req.on("end", () => {
+              resolve();
+            });
+          });
+          console.log("REQUEST", req.method, req.url);
           // TODO Add referer checks
           res.writeHead(200, {
             "Content-Type": "application/json",
@@ -469,9 +487,15 @@ export default class MDocsRepository {
                     "Content-Type": "application/octet-stream",
                     "Access-Control-Allow-Origin": url
                   });
-                  let pdf = await this.previewer(await this.processFile(file));
-                  console.log(pdf);
-                  res.write(pdf);
+                  res.write(await this.previewer(await this.processFile(file)));
+                } else if (match[1] === "html") {
+                  res.writeHead(200, {
+                    "Content-Type": "text/html",
+                    "Access-Control-Allow-Origin": url
+                  });
+                  res.write(
+                    await this.previewer(await this.processFile(file), "html")
+                  );
                 }
               } else {
                 res.writeHead(404);
@@ -488,10 +512,18 @@ export default class MDocsRepository {
               let match = req.url.match(/\/(\w+)\/(.*)/);
               if (match && this.files[match[2]]) {
                 let file = this.files[match[2]];
+                fs.writeFileSync(file.absPath, body);
               } else {
                 res.writeHead(404);
               }
             }
+          } else if (req.method === "OPTIONS") {
+            // Always let throught the OPTIONS for now
+            res.writeHead(200, {
+              "Content-Type": "text/plain",
+              "Access-Control-Allow-Origin": url,
+              "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE"
+            });
           } else {
             res.writeHead(404);
           }

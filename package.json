@@ -27,6 +27,7 @@
     "remarkable-plantuml": "^1.1.0",
     "semver": "^6.3.0",
     "simple-git": "^1.124.0",
+    "through": "^2.3.8",
     "yaml": "^1.6.0",
     "yargs": "^14.0.0"
   },

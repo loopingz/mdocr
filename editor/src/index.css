@@ -76,7 +76,8 @@ code {
   width: 0px;
 }
 
-.react-pdf__Document {
+.react-pdf__Document,
+.previewContent {
   bottom: 60px;
   position: absolute;
   top: 48px;

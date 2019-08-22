@@ -56,6 +56,9 @@ const useStyles = makeStyles(theme => ({
   }
 }));
 
+let updateInterval;
+let previewInterval;
+
 export default function App() {
   // Autosuggest will call this function every time you need to update suggestions.
   // You already implemented this logic above, so just use it.
@@ -97,6 +100,7 @@ export default function App() {
   const getBuildMarkdown = async () => {};
 
   const getPreviewContent = async prev => {
+    if (prev.value === "none") return;
     setPreviewLoading(true);
     let res = await fetch(`${url}/${prev.value}/${current.gitPath}`);
     if (prev.value === "pdf") {
@@ -109,15 +113,21 @@ export default function App() {
   let previewElement = (
     <SearchIcon style={{ width: "128px", height: "128px", color: "#999" }} />
   );
-  //let addComponent = false;
+  let addComponent = false;
   if (previewLoading) {
-    //addComponent = true;
+    addComponent = true;
     previewElement = <CircularProgress className={classes.progress} />;
-  } else if (preview) {
+  } else if (preview && preview.value !== "none") {
     if (preview.value === "build") {
       previewElement = <pre>{previewContent}</pre>;
     } else if (preview.value === "html") {
-      previewElement = <div>{previewContent}</div>;
+      previewElement = (
+        <div
+          className="previewContent"
+          style={{ padding: 10 }}
+          dangerouslySetInnerHTML={{ __html: previewContent }}
+        />
+      );
     } else if (preview.value === "pdf") {
       let pages = [];
       for (let i = 1; i <= numPages; i++) {
@@ -134,23 +144,54 @@ export default function App() {
         </Document>
       );
     }
+  } else {
+    addComponent = true;
   }
-  /*
-  let previewComponent = (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        position: "absolute",
-        width: "100%",
-        bottom: "60px",
-        top: "48px"
-      }}
-    >
-      {previewElement}
-    </div>
-  );*/
+
+  if (addComponent) {
+    previewElement = (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          position: "absolute",
+          width: "100%",
+          bottom: "60px",
+          top: "48px"
+        }}
+      >
+        {previewElement}
+      </div>
+    );
+  }
+
+  const onMarkdownChange = val => {
+    setValue(val);
+    if (updateInterval) {
+      clearTimeout(updateInterval);
+    }
+    updateInterval = setTimeout(async () => {
+      let res = await fetch(`${url}/drafts/${current.gitPath}`, {
+        method: "PUT",
+        body: val
+      });
+      if (preview) {
+        if (previewInterval) {
+          clearTimeout(previewInterval);
+        }
+        let interval = 5000;
+        if (preview.value === "build") {
+          interval = 100;
+        }
+        previewInterval = setTimeout(() => {
+          if (preview) {
+            getPreviewContent(preview);
+          }
+        }, interval);
+      }
+    }, 1000);
+  };
 
   const getDraftMarkdown = async () => {};
   return (
@@ -165,7 +206,7 @@ export default function App() {
       <div>
         <ReactMde
           value={value}
-          onChange={setValue}
+          onChange={onMarkdownChange}
           minEditorHeight="inherit"
           generateMarkdownPreview={async markdown => {
             if (!current) {
@@ -213,6 +254,9 @@ export default function App() {
             <Select
               value={preview}
               onChange={value => {
+                if (previewInterval) {
+                  clearTimeout(previewInterval);
+                }
                 setPreview(value);
                 getPreviewContent(value);
               }}
@@ -220,13 +264,18 @@ export default function App() {
               options={[
                 { label: "PDF", value: "pdf" },
                 { label: "HTML", value: "html" },
-                { label: "Markdown", value: "build" }
+                { label: "Markdown", value: "build" },
+                { label: "-", value: "none" }
               ]}
             />
           </div>
           <div>
             <IconButton color="inherit">
-              <RefreshIcon />
+              <RefreshIcon
+                onClick={() => {
+                  getPreviewContent(preview);
+                }}
+              />
             </IconButton>
           </div>
         </div>
