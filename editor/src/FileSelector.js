@@ -1,4 +1,4 @@
-import { makeStyles, useTheme, emphasize } from "@material-ui/core/styles";
+import { makeStyles, emphasize } from "@material-ui/core/styles";
 import React from "react";
 import PropTypes from "prop-types";
 import Typography from "@material-ui/core/Typography";
@@ -252,7 +252,7 @@ function Control(props) {
     <TextField
       fullWidth
       InputProps={{
-        classes: { imput: classes.input },
+        classes: { input: classes.input },
         inputComponent,
         inputProps: {
           className: classes.input,
@@ -278,7 +278,6 @@ const components = {
 
 export default function FileSelector(props) {
   const classes = useStyles();
-  const theme = useTheme();
   const selectStyles = {
     input: base => ({
       ...base,

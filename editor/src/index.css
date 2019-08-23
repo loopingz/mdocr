@@ -95,3 +95,12 @@ code {
   width: 100% !important;
   height: inherit !important;
 }
+
+.MuiDialog-paperFullScreen {
+  padding-top: 80px;
+}
+
+.diff {
+  font-size: 12px;
+  font-family: sans-serif;
+}

@@ -1,12 +1,9 @@
 import React from "react";
-import logo from "./logo.svg";
 import "./App.css";
-import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import AppBar from "@material-ui/core/AppBar";
 import Toolbar from "@material-ui/core/Toolbar";
 import IconButton from "@material-ui/core/IconButton";
-import Paper from "@material-ui/core/Paper";
-import Fab from "@material-ui/core/Fab";
 import AddIcon from "@material-ui/icons/Add";
 import RefreshIcon from "@material-ui/icons/Refresh";
 import PublishIcon from "@material-ui/icons/Publish";
@@ -19,6 +16,8 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import FileSelector from "./FileSelector";
 import Select from "react-select";
 import { Document, Page, pdfjs } from "react-pdf";
+
+import { CommitDialog, PublishDialog } from "./Dialogs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${
   pdfjs.version
 }/pdf.worker.js`;
@@ -38,6 +37,13 @@ const useStyles = makeStyles(theme => ({
   },
   subheader: {
     backgroundColor: theme.palette.background.paper
+  },
+  dialogAppBar: {
+    position: "relative"
+  },
+  title: {
+    marginLeft: theme.spacing(2),
+    flex: 1
   },
   appBar: {
     top: "auto",
@@ -65,19 +71,16 @@ export default function App() {
   const [mdocr, setMdocr] = React.useState();
   const url = "http://localhost:18181";
   const [value, setValue] = React.useState("");
-  const [pageNumber, setPageNumber] = React.useState(1);
   const [current, setCurrent] = React.useState(null);
   const [preview, setPreview] = React.useState(null);
   const [numPages, setNumPages] = React.useState(0);
   const [previewContent, setPreviewContent] = React.useState(null);
   const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [commitMode, setCommitMode] = React.useState(false);
+  const [publishMode, setPublishMode] = React.useState(false);
+  const [addMode, setAddMode] = React.useState(false);
 
-  const [state, setState] = React.useState({
-    single: "",
-    popper: ""
-  });
   const classes = useStyles();
-  const theme = useTheme();
 
   if (!mdocr) {
     (async () => {
@@ -90,14 +93,6 @@ export default function App() {
       </div>
     );
   }
-
-  const handleChange = name => (event, { newValue }) => {
-    setState({
-      ...state,
-      [name]: newValue
-    });
-  };
-  const getBuildMarkdown = async () => {};
 
   const getPreviewContent = async prev => {
     if (prev.value === "none") return;
@@ -165,17 +160,17 @@ export default function App() {
       </div>
     );
   }
-
   const onMarkdownChange = val => {
     setValue(val);
     if (updateInterval) {
       clearTimeout(updateInterval);
     }
     updateInterval = setTimeout(async () => {
-      let res = await fetch(`${url}/drafts/${current.gitPath}`, {
+      await fetch(`${url}/drafts/${current.gitPath}`, {
         method: "PUT",
         body: val
       });
+      setMdocr({ ...mdocr, isDirty: true });
       if (preview) {
         if (previewInterval) {
           clearTimeout(previewInterval);
@@ -193,94 +188,141 @@ export default function App() {
     }, 1000);
   };
 
-  const getDraftMarkdown = async () => {};
+  const refreshCurrent = async (file = current) => {
+    if (!file) {
+      return;
+    }
+    let res = await fetch(`${url}/drafts/${file.gitPath}`);
+    setValue(await res.text());
+    if (preview) {
+      getPreviewContent(preview);
+    }
+  };
+
   return (
-    <SplitPane
-      split="vertical"
-      defaultSize={parseInt(
-        localStorage.getItem("splitPos") || window.innerWidth / 2,
-        10
-      )}
-      onChange={size => localStorage.setItem("splitPos", size)}
-    >
-      <div>
-        <ReactMde
-          value={value}
-          onChange={onMarkdownChange}
-          minEditorHeight="inherit"
-          generateMarkdownPreview={async markdown => {
-            if (!current) {
-              return "";
-            }
-            let res = await fetch(`${url}/build/${current.gitPath}`);
-            return `<pre>${await res.text()}</pre>`;
-          }}
-        />
-        <AppBar position="fixed" color="primary" className={classes.appBar}>
-          <Toolbar>
-            <FileSelector
-              drafts={Object.values(mdocr.files)}
-              onChange={async value => {
-                setCurrent(value);
-                let res = await fetch(`${url}/drafts/${value.gitPath}`);
-                setValue(await res.text());
-              }}
-            />
-            <IconButton color="inherit">
-              <AddIcon />
-            </IconButton>
-            <div className={classes.grow}>Repository: {mdocr.path}</div>
-            <IconButton color="inherit">
-              <CommitIcon />
-            </IconButton>
-            <IconButton edge="end" color="inherit">
-              <PublishIcon />
-            </IconButton>
-          </Toolbar>
-        </AppBar>
-      </div>
-      <div>
-        <div
-          style={{
-            backgroundColor: "#f9f9f9",
-            display: "flex",
-            height: "44px",
-            borderBottom: "1px solid #c8ccd0",
-            borderRadius: "2px 2px 0 0"
-          }}
-        >
-          <div style={{ padding: 10 }}>Preview</div>
-          <div style={{ paddingRight: 10, paddingTop: 3, flexGrow: 1 }}>
-            <Select
-              value={preview}
-              onChange={value => {
-                if (previewInterval) {
-                  clearTimeout(previewInterval);
-                }
-                setPreview(value);
-                getPreviewContent(value);
-              }}
-              placeholder="Select a type of preview"
-              options={[
-                { label: "PDF", value: "pdf" },
-                { label: "HTML", value: "html" },
-                { label: "Markdown", value: "build" },
-                { label: "-", value: "none" }
-              ]}
-            />
-          </div>
-          <div>
-            <IconButton color="inherit">
-              <RefreshIcon
-                onClick={() => {
-                  getPreviewContent(preview);
+    <div>
+      <SplitPane
+        split="vertical"
+        defaultSize={parseInt(
+          localStorage.getItem("splitPos") || window.innerWidth / 2,
+          10
+        )}
+        onChange={size => localStorage.setItem("splitPos", size)}
+      >
+        <div>
+          <ReactMde
+            value={value}
+            onChange={onMarkdownChange}
+            minEditorHeight="inherit"
+            generateMarkdownPreview={async markdown => {
+              if (!current) {
+                return "";
+              }
+              let res = await fetch(`${url}/build/${current.gitPath}`);
+              return `<pre>${await res.text()}</pre>`;
+            }}
+          />
+          <AppBar position="fixed" color="primary" className={classes.appBar}>
+            <Toolbar>
+              <FileSelector
+                drafts={Object.values(mdocr.files)}
+                onChange={async value => {
+                  setCurrent(value);
+                  refreshCurrent(value);
                 }}
               />
-            </IconButton>
-          </div>
+              <IconButton color="inherit" onClick={() => setAddMode(true)}>
+                <AddIcon />
+              </IconButton>
+              <div className={classes.grow}>Repository: {mdocr.path}</div>
+              <IconButton
+                disabled={!mdocr.isDirty}
+                color="inherit"
+                onClick={() => setCommitMode(true)}
+              >
+                <CommitIcon />
+              </IconButton>
+              <IconButton
+                edge="end"
+                color="inherit"
+                disabled={mdocr.isDirty}
+                onClick={() => setPublishMode(true)}
+              >
+                <PublishIcon />
+              </IconButton>
+            </Toolbar>
+          </AppBar>
         </div>
-        {previewElement}
-      </div>
-    </SplitPane>
+        <div>
+          <div
+            style={{
+              backgroundColor: "#f9f9f9",
+              display: "flex",
+              height: "44px",
+              borderBottom: "1px solid #c8ccd0",
+              borderRadius: "2px 2px 0 0"
+            }}
+          >
+            <div style={{ padding: 10 }}>Preview</div>
+            <div style={{ paddingRight: 10, paddingTop: 3, flexGrow: 1 }}>
+              <Select
+                value={preview}
+                onChange={value => {
+                  if (previewInterval) {
+                    clearTimeout(previewInterval);
+                  }
+                  setPreview(value);
+                  getPreviewContent(value);
+                }}
+                placeholder="Select a type of preview"
+                options={[
+                  { label: "PDF", value: "pdf" },
+                  { label: "HTML", value: "html" },
+                  { label: "Markdown", value: "build" },
+                  { label: "-", value: "none" }
+                ]}
+              />
+            </div>
+            <div>
+              <IconButton color="inherit">
+                <RefreshIcon
+                  onClick={() => {
+                    getPreviewContent(preview);
+                  }}
+                />
+              </IconButton>
+            </div>
+          </div>
+          {previewElement}
+        </div>
+      </SplitPane>
+
+      <PublishDialog
+        open={publishMode}
+        onClose={() => setPublishMode(false)}
+        url={url}
+        onAction={async () => {
+          await fetch(`${url}/release`, {
+            method: "PUT"
+          });
+          await refreshCurrent();
+          return true;
+        }}
+      />
+
+      <CommitDialog
+        open={commitMode}
+        onClose={() => setCommitMode(false)}
+        url={url}
+        onAction={async message => {
+          await fetch(`${url}/commit`, {
+            method: "PUT",
+            body: JSON.stringify({ message })
+          });
+          setMdocr({ ...mdocr, isDirty: false });
+          return true;
+        }}
+      />
+    </div>
   );
 }

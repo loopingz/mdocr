@@ -181,6 +181,7 @@ export default class MDocsRepository {
         str = str.substr(str.indexOf("---") + 3);
       }
     }
+    // TODO Move to nunjucks template engine: https://mozilla.github.io/nunjucks/
     while ((res = str.search(/<[^>]*>/)) >= 0) {
       result += str.substr(0, res);
       str = str.substr(res + 1);
@@ -242,16 +243,23 @@ export default class MDocsRepository {
     return this.gitFiles[file] !== undefined;
   }
 
-  async publish(preview = false, file: string = undefined) {
+  async isDirty() {
     let status = await this.git.status();
     if (status.files.filter(i => this.isIncludedInFiles(i.path)).length > 0) {
+      return true;
+    }
+    return false;
+  }
+
+  async publish(preview = false, file: string = undefined) {
+    if (await this.isDirty()) {
       console.log(
         "You need to work from a clean repository, stash your changes"
       );
       return false;
     }
     await this.build((...args) => {}, file);
-    status = await this.git.status();
+    let status = await this.git.status();
     let files = status.files
       .filter(f => {
         return f.path.startsWith(this.config.buildDir);
@@ -454,7 +462,29 @@ export default class MDocsRepository {
             "Access-Control-Allow-Origin": url
           });
           if (req.method === "GET") {
-            if (req.url === "/stop") {
+            if (req.url === "/release") {
+              let commits = (await this.git.log()).all;
+              let hash = "";
+              for (let i in commits) {
+                hash = commits[i].hash;
+                if (commits[i].message.startsWith("release:")) {
+                  break;
+                }
+              }
+              res.writeHead(200, {
+                "Content-Type": "text/plain",
+                "Access-Control-Allow-Origin": url
+              });
+              await this.build((...args) => {});
+              res.write(await this.git.diff([hash]));
+            } else if (req.url === "/changes") {
+              res.writeHead(200, {
+                "Content-Type": "text/plain",
+                "Access-Control-Allow-Origin": url
+              });
+              await this.build((...args) => {});
+              res.write(await this.git.diff());
+            } else if (req.url === "/stop") {
               res.write(JSON.stringify({ message: "Bye!" }));
               res.end();
               resolve();
@@ -463,7 +493,8 @@ export default class MDocsRepository {
                 JSON.stringify({
                   files: this.files,
                   version: packageInfo.version,
-                  path: this.rootPath
+                  path: this.rootPath,
+                  isDirty: await this.isDirty()
                 })
               );
             } else {
@@ -502,12 +533,21 @@ export default class MDocsRepository {
               }
             }
           } else if (req.method === "PUT") {
-            if (req.url === "/commit") {
+            if (req.url === "/release") {
+              await this.init();
+              await this.publish();
+            } else if (req.url === "/commit") {
               /**
               {
                 message: ""
               }
                */
+              let params: any = JSON.parse(body);
+              let status = await this.git.diffSummary();
+              for (let i in status.files) {
+                await this.git.add(status.files[i].file);
+              }
+              await this.git.commit(params.message);
             } else {
               let match = req.url.match(/\/(\w+)\/(.*)/);
               if (match && this.files[match[2]]) {
