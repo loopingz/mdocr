@@ -45,6 +45,19 @@ const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
+function getVersionIncrement(message) {
+  let incr = 1;
+  if (message.indexOf("BREAKING") >= 0) {
+    incr = 100;
+  } else if (message.startsWith("feature:")) {
+    incr = 10;
+  }
+  if (message.startsWith("release:")) {
+    incr = 1;
+  }
+  return incr;
+}
+
 const useDiffChangesApi = diffUrl => {
   const [diffFiles, setDiffFiles] = React.useState([]);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -75,9 +88,10 @@ export function DiffDialog(props) {
   const classes = useStyles();
   const txtClasses = useStylesReddit();
   const [commitMessage, setCommitMessage] = React.useState(undefined);
+  const [incr, setIncr] = React.useState(1);
 
   const { diffFiles, isLoading } = useDiffChangesApi(
-    `${props.url}${props.diffUrl}`
+    `${props.url}${props.diffUrl}?incr=${incr}`
   );
 
   const label = props.label || "Commit changes";
@@ -110,6 +124,8 @@ export function DiffDialog(props) {
       }
     }
   };
+
+  const filter = props.filter || (() => true);
   // Move this one
   let mid = <div style={{ flex: 1 }} />;
   if (props.commit) {
@@ -121,7 +137,12 @@ export function DiffDialog(props) {
         style={{ flex: 1, marginLeft: 30, marginRight: 30, color: "white" }}
         variant="filled"
         value={commitMessage}
-        onChange={({ target: { value } }) => setCommitMessage(value)}
+        onChange={({ target: { value } }) => {
+          if (incr !== getVersionIncrement(value)) {
+            setIncr(getVersionIncrement(value));
+          }
+          setCommitMessage(value);
+        }}
       />
     );
   }
@@ -149,7 +170,7 @@ export function DiffDialog(props) {
       {isLoading ? (
         <CircularProgress className={classes.progress} />
       ) : (
-        (diffFiles || []).map(renderFile)
+        (diffFiles || []).filter(filter).map(renderFile)
       )}
     </div>
   );
@@ -161,6 +182,9 @@ export function PublishDialog(props) {
       {props.open ? (
         <DiffDialog
           label="Publish new versions"
+          filter={file => {
+            return file.newPath.startsWith("build/"); // TODO Should be variable
+          }}
           actionLabel="publish"
           diffUrl="/release"
           {...props}

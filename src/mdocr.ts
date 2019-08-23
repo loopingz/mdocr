@@ -20,7 +20,10 @@ async function Import(cmd, ctx, mdocr) {
   }
 }
 
-async function CurrentVersion(cmd, ctx) {
+async function CurrentVersion(cmd, ctx, mdocr) {
+  if (mdocr.buildForRelease() && ctx.commits.length > 0) {
+    return ctx.nextVersion;
+  }
   if (ctx.isDirty || !ctx.meta.Versions) {
     return ctx.nextVersion + "-SNAPSHOT";
   } else if (ctx.meta.Versions) {
@@ -28,21 +31,32 @@ async function CurrentVersion(cmd, ctx) {
   }
 }
 
-async function VersionsTable(cmd, ctx) {
+async function VersionsTable(cmd, ctx, mdocr) {
   let res = `
 | Version | Date       | Authors     | Reviewers    |
 |---------|------------|-------------|--------------|
 `;
   ctx.meta.Versions = ctx.meta.Versions || [];
   let versions = [...ctx.meta.Versions];
-  if (ctx.isDirty) {
+
+  if (mdocr.buildForRelease() && ctx.commits.length > 0) {
+    versions.unshift({
+      Id: ctx.nextVersion,
+      Date: dateFormat(Date.now(), "yyyy-mm-dd"),
+      Authors: [...new Set(ctx.commits.map(i => i.author_name))].join(","), // Creating a unique set of authors
+      Reviewer: mdocr.getCurrentUser()
+    });
+  } else if (ctx.isDirty) {
+    let authors = new Set(ctx.commits.map(i => i.author_name));
+    authors.add(mdocr.getCurrentUser());
     versions.unshift({
       Id: ctx.nextVersion + "-SNAPSHOT",
       Date: dateFormat(Date.now(), "yyyy-mm-dd"),
-      Authors: [...new Set(ctx.commits.map(i => i.author_name))].join(","), // Creating a unique set of authors
+      Authors: [...authors].join(","), // Creating a unique set of authors
       Reviewer: "N/A"
     });
   }
+
   versions.forEach(version => {
     res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${
       version.Reviewer
@@ -68,6 +82,9 @@ export default class MDocsRepository {
   protected gitFiles: any = {};
   protected files: any = {};
   protected config: any = {};
+  protected currentUser: string;
+  protected releasing: boolean = false;
+  protected increment: number = 0;
   /**
    *
    * @param rootPath Path to the git repository of documents
@@ -110,7 +127,19 @@ export default class MDocsRepository {
     this.publishers.push(pub);
   }
 
-  async init() {
+  async init(message: string = undefined) {
+    if (!this.currentUser) {
+      this.currentUser = (await this.git.raw([
+        "config",
+        "--get",
+        "user.name"
+      ])).trim();
+    }
+    if (message) {
+      this.increment = this.getVersionIncrement(message);
+    } else {
+      this.increment = 1;
+    }
     let files = this.config.files
       .map(file => {
         return glob({ gitignore: true })
@@ -119,8 +148,15 @@ export default class MDocsRepository {
       })
       .join("|")
       .split("|");
+    let status = (await this.git.status()).files.map(i => i.path);
     for (let i in files) {
       this.files[files[i]] = await this.analyse(files[i]);
+
+      if (status.indexOf(this.files[files[i]].gitPath) >= 0) {
+        console.log("forcing to dirty");
+        this.files[files[i]].isDirty = true;
+      }
+
       this.targets[this.files[files[i]].gitTarget] = files[i];
       this.gitFiles[this.files[files[i]].gitPath] = files[i];
     }
@@ -221,22 +257,25 @@ export default class MDocsRepository {
     return this.files[this.targets[target]];
   }
 
+  getCurrentUser() {
+    return this.currentUser;
+  }
+
   async getDocumentVersion(src) {
-    let Reviewer = (await this.git.raw([
-      "config",
-      "--get",
-      "user.name"
-    ])).trim();
     let Authors = [...new Set(src.commits.map(i => i.author_name))].join(",");
     if (Authors.length === 0) {
-      Authors = Reviewer;
+      Authors = this.getCurrentUser();
     }
     return {
       Id: src.nextVersion,
       Date: dateFormat(Date.now(), "yyyy-mm-dd"),
       Authors,
-      Reviewer
+      Reviewer: this.getCurrentUser()
     };
+  }
+
+  buildForRelease() {
+    return this.releasing;
   }
 
   isIncludedInFiles(file) {
@@ -258,7 +297,9 @@ export default class MDocsRepository {
       );
       return false;
     }
+    this.releasing = true;
     await this.build((...args) => {}, file);
+    this.releasing = false;
     let status = await this.git.status();
     let files = status.files
       .filter(f => {
@@ -323,7 +364,7 @@ export default class MDocsRepository {
   async getNextVersion(file) {
     let commits = file.commits || [];
     let versions = file.meta.Versions || [];
-    let incr = Math.max(...commits.map(i => i.incr));
+    let incr = Math.max(...commits.map(i => i.incr), this.getGlobalIncrement());
     let nextVersion = "1.0.0";
     if (versions.length) {
       nextVersion = versions[0].Id;
@@ -346,19 +387,24 @@ export default class MDocsRepository {
       file,
       from
     })).all.map(c => {
-      c.incr = 1;
-      if (c.message.indexOf("BREAKING") >= 0) {
-        c.incr = 100;
-      } else if (c.message.startsWith("feature:")) {
-        c.incr = 10;
-      }
-      if (c.message.startsWith("release:")) {
-        c.incr = 1;
-      }
+      c.incr = this.getVersionIncrement(c.message);
       c.release = c.message.startsWith("release:");
       return c;
     });
     return commits;
+  }
+
+  getVersionIncrement(message) {
+    let incr = 1;
+    if (message.indexOf("BREAKING") >= 0) {
+      incr = 100;
+    } else if (message.startsWith("feature:")) {
+      incr = 10;
+    }
+    if (message.startsWith("release:")) {
+      incr = 1;
+    }
+    return incr;
   }
 
   async previewer(str, type: string = "pdf") {
@@ -400,6 +446,10 @@ export default class MDocsRepository {
         .from(file.target)
         .to(file.published.replace(/\.md/, ".pdf"), resolve);
     });
+  }
+
+  getGlobalIncrement() {
+    return this.increment;
   }
 
   async build(log = console.log, file: string = undefined) {
@@ -462,7 +512,7 @@ export default class MDocsRepository {
             "Access-Control-Allow-Origin": url
           });
           if (req.method === "GET") {
-            if (req.url === "/release") {
+            if (req.url.startsWith("/release")) {
               let commits = (await this.git.log()).all;
               let hash = "";
               for (let i in commits) {
@@ -475,13 +525,24 @@ export default class MDocsRepository {
                 "Content-Type": "text/plain",
                 "Access-Control-Allow-Origin": url
               });
+              await this.init();
+              this.releasing = true;
               await this.build((...args) => {});
+              this.releasing = false;
               res.write(await this.git.diff([hash]));
-            } else if (req.url === "/changes") {
+            } else if (req.url.startsWith("/changes")) {
+              let match = req.url.match(/\/changes\?.*incr=(\d+)/) || ["", ""];
+              let msg = "fix:";
+              if (match[1] == 100) {
+                msg = "BREAKING";
+              } else if (match[1] == 10) {
+                msg = "feature:";
+              }
               res.writeHead(200, {
                 "Content-Type": "text/plain",
                 "Access-Control-Allow-Origin": url
               });
+              await this.init(msg);
               await this.build((...args) => {});
               res.write(await this.git.diff());
             } else if (req.url === "/stop") {
@@ -543,6 +604,8 @@ export default class MDocsRepository {
               }
                */
               let params: any = JSON.parse(body);
+              await this.init(params.message);
+              await this.build((...args) => {});
               let status = await this.git.diffSummary();
               for (let i in status.files) {
                 await this.git.add(status.files[i].file);
@@ -581,15 +644,15 @@ export default class MDocsRepository {
     }
 
     require("yargs")
-      .command(
-        ["build [file]"],
-        "Build all markdowns or specific file running all commands",
-        {},
-        async argv => {
-          await drepo.init();
+      .command({
+        command: "build [file]",
+        builder: yargs => yargs.string("message"),
+        desc: "Build all markdowns or specific file running all commands",
+        handler: async argv => {
+          await drepo.init(argv.message);
           await drepo.build(console.log, argv.file);
         }
-      )
+      })
       .command({
         command: "publish [file]",
         builder: yargs => yargs.boolean("pretend"),
