@@ -73,6 +73,7 @@ export default class MDocsRepository {
   protected rootPath: string;
   protected git: any;
   protected cssPath: string;
+  protected cssContent: string;
   protected publishers: any[] = [];
   protected commands: any = {
     Import,
@@ -123,7 +124,7 @@ export default class MDocsRepository {
     if (!fs.existsSync(this.cssPath)) {
       this.cssPath = path.join(__dirname, "..", "mdocr.css");
     }
-    console.log("cssPath", this.cssPath);
+    this.cssContent = fs.readFileSync(this.cssPath).toString();
   }
 
   addCommand(command, plugin) {
@@ -438,7 +439,7 @@ export default class MDocsRepository {
         });
     });
     if (type === "html") {
-      return html || "";
+      return `<style>${this.cssContent}</style>${html}` || "";
     }
     return pdf;
   }
@@ -465,7 +466,7 @@ export default class MDocsRepository {
         .from(file.target)
         .to(file.published.replace(/\.md/, ".pdf"), resolve);
     });
-    fs.writeFileSync(file.published.replace(/\.md/, ".html"), html);
+    fs.writeFileSync(file.published.replace(/\.md/, ".html"), `<style>${this.cssContent}</style>${html}`);
     return;
   }
 
