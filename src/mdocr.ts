@@ -116,7 +116,7 @@ export default class MDocsRepository {
     this.config.publishedDir = path.normalize(
       this.config.publishedDir || "published/"
     );
-    if (this.config.pdf || true) {
+    if (this.config.pdf) {
       this.publishers.push(this.pdf.bind(this));
     }
     
@@ -516,7 +516,7 @@ export default class MDocsRepository {
     let packageInfo = require("../package.json");
     return new Promise(resolve => {
       const http = require("http");
-      const server = http
+      http
         .createServer(async (req, res) => {
           let body = "";
           await new Promise(resolve => {
