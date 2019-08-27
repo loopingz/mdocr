@@ -34,7 +34,7 @@ async function CurrentVersion(cmd, ctx, mdocr) {
 async function VersionsTable(cmd, ctx, mdocr) {
   let res = `
 | Version | Date       | Authors     | Reviewers    |
-|---------|------------|-------------|--------------|
+|-|-|-|-|
 `;
   ctx.meta.Versions = ctx.meta.Versions || [];
   let versions = [...ctx.meta.Versions];
@@ -72,6 +72,7 @@ async function VersionsTable(cmd, ctx, mdocr) {
 export default class MDocsRepository {
   protected rootPath: string;
   protected git: any;
+  protected cssPath: string;
   protected publishers: any[] = [];
   protected commands: any = {
     Import,
@@ -114,9 +115,15 @@ export default class MDocsRepository {
     this.config.publishedDir = path.normalize(
       this.config.publishedDir || "published/"
     );
-    if (this.config.pdf) {
+    if (this.config.pdf || true) {
       this.publishers.push(this.pdf.bind(this));
     }
+    
+    this.cssPath = path.join(process.cwd(), "mdocr.css");
+    if (!fs.existsSync(this.cssPath)) {
+      this.cssPath = path.join(__dirname, "..", "mdocr.css");
+    }
+    console.log("cssPath", this.cssPath);
   }
 
   addCommand(command, plugin) {
@@ -418,9 +425,11 @@ export default class MDocsRepository {
             this.queue(data);
           });
         },
+        cssPath: this.cssPath,
         remarkable: {
           preset: "commonmark",
-          plugins: [require("remarkable-plantuml"), require("remarkable-meta")]
+          plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
+          syntax: ['table']
         }
       })
         .from.string(str)
@@ -435,17 +444,29 @@ export default class MDocsRepository {
   }
 
   async pdf(file) {
-    return new Promise(resolve => {
+    const through = require("through");
+    let html;
+    
+    await new Promise(resolve => {
       markdownpdf({
-        //preProcessHtml: preProcessMd,
+        preProcessHtml: () => {
+          return through(function(data) {
+            html = data.toString();
+            this.queue(data);
+          });
+        },
+        cssPath: this.cssPath,
         remarkable: {
           preset: "commonmark",
-          plugins: [require("remarkable-plantuml"), require("remarkable-meta")]
+          plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
+          syntax: ['table']
         }
       })
         .from(file.target)
         .to(file.published.replace(/\.md/, ".pdf"), resolve);
     });
+    fs.writeFileSync(file.published.replace(/\.md/, ".html"), html);
+    return;
   }
 
   getGlobalIncrement() {
@@ -555,7 +576,8 @@ export default class MDocsRepository {
                   files: this.files,
                   version: packageInfo.version,
                   path: this.rootPath,
-                  isDirty: await this.isDirty()
+                  isDirty: await this.isDirty(),
+                  repository: "git://..."
                 })
               );
             } else {

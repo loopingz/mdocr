@@ -17,7 +17,12 @@ import FileSelector from "./FileSelector";
 import Select from "react-select";
 import { Document, Page, pdfjs } from "react-pdf";
 
-import { CommitDialog, PublishDialog } from "./Dialogs";
+import {
+  CommitDialog,
+  PublishDialog,
+  IntroDialog,
+  WelcomeDialog
+} from "./Dialogs";
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${
   pdfjs.version
 }/pdf.worker.js`;
@@ -83,15 +88,7 @@ export default function App() {
   const classes = useStyles();
 
   if (!mdocr) {
-    (async () => {
-      let res = await fetch(`${url}/mdocr`);
-      setMdocr(await res.json());
-    })();
-    return (
-      <div>
-        <CircularProgress className={classes.progress} />
-      </div>
-    );
+    return <IntroDialog onMdocr={setMdocr} url={url} />;
   }
 
   const getPreviewContent = async prev => {
@@ -198,6 +195,18 @@ export default function App() {
       getPreviewContent(preview);
     }
   };
+
+  if (!current && mdocr) {
+    return (
+      <WelcomeDialog
+        mdocr={mdocr}
+        onChange={async value => {
+          setCurrent(value);
+          refreshCurrent(value);
+        }}
+      />
+    );
+  }
 
   return (
     <div>

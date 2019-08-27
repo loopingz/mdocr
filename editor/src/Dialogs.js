@@ -2,6 +2,10 @@ import React from "react";
 
 import Slide from "@material-ui/core/Slide";
 import Dialog from "@material-ui/core/Dialog";
+import DialogActions from "@material-ui/core/DialogActions";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogContentText from "@material-ui/core/DialogContentText";
+import DialogTitle from "@material-ui/core/DialogTitle";
 import Typography from "@material-ui/core/Typography";
 import CloseIcon from "@material-ui/icons/Close";
 import Button from "@material-ui/core/Button";
@@ -13,6 +17,8 @@ import TextField from "@material-ui/core/TextField";
 import { parseDiff, Diff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import { useTheme } from "@material-ui/core/styles";
+import FileSelector from "./FileSelector";
 
 const useStyles = makeStyles(theme => ({
   appBar: {
@@ -206,6 +212,66 @@ export function CommitDialog(props) {
           {...props}
         />
       ) : null}
+    </Dialog>
+  );
+}
+
+async function checkMdocr(url, callback) {
+  try {
+    let res = await fetch(`${url}/mdocr`);
+    callback(await res.json());
+  } catch (err) {
+    setTimeout(checkMdocr.bind(this, url, callback), 1000);
+  }
+}
+
+export function IntroDialog(props) {
+  checkMdocr(props.url, props.onMdocr);
+  const theme = useTheme();
+  return (
+    <Dialog
+      fullScreen={true}
+      open={true}
+      aria-labelledby="responsive-dialog-title"
+    >
+      <DialogTitle id="responsive-dialog-title">
+        MDocr Repository Editor
+      </DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          You can use MDocr to manage your Markdown documents in a Git
+          repository.
+        </DialogContentText>
+        <DialogContentText>Install requirements</DialogContentText>
+        <DialogContentText>...</DialogContentText>
+        <DialogContentText>
+          Launch in your repository: mdocr edit
+        </DialogContentText>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function WelcomeDialog(props) {
+  return (
+    <Dialog
+      fullScreen={true}
+      open={true}
+      aria-labelledby="responsive-dialog-title"
+    >
+      <DialogTitle id="responsive-dialog-title">
+        {"Choose a file to edit"}
+      </DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Current repository: {props.mdocr.repository}
+        </DialogContentText>
+        <DialogContentText>Please select a file</DialogContentText>
+        <FileSelector
+          drafts={Object.values(props.mdocr.files)}
+          onChange={props.onChange}
+        />
+      </DialogContent>
     </Dialog>
   );
 }
