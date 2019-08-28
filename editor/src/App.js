@@ -76,6 +76,7 @@ export default function App() {
   const [mdocr, setMdocr] = React.useState();
   const url = "http://localhost:18181";
   const [value, setValue] = React.useState("");
+  const [meta, setMeta] = React.useState("");
   const [current, setCurrent] = React.useState(null);
   const [preview, setPreview] = React.useState(null);
   const [numPages, setNumPages] = React.useState(0);
@@ -165,7 +166,7 @@ export default function App() {
     updateInterval = setTimeout(async () => {
       await fetch(`${url}/drafts/${current.gitPath}`, {
         method: "PUT",
-        body: val
+        body: meta + val
       });
       setMdocr({ ...mdocr, isDirty: true });
       if (preview) {
@@ -190,7 +191,13 @@ export default function App() {
       return;
     }
     let res = await fetch(`${url}/drafts/${file.gitPath}`);
-    setValue(await res.text());
+    let md = await res.text();
+    if (md.startsWith("---")) {
+      let curMeta = md.substr(0, md.substr(3).indexOf("---") + 7);
+      setMeta(curMeta);
+      md = md.substr(curMeta.length);
+    }
+    setValue(md);
     if (preview) {
       getPreviewContent(preview);
     }

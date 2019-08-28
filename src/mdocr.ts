@@ -89,7 +89,7 @@ export abstract class TemplateExtension {
 /**
  * Main Class for MDocs
  */
-export default class MDocsRepository {
+export default class MDocrRepository {
   protected rootPath: string;
   protected git: any;
   protected cssPath: string;
@@ -704,7 +704,7 @@ export default class MDocsRepository {
   }
 
   static async commandLine() {
-    let drepo = new MDocsRepository();
+    let drepo = new MDocrRepository();
     if (!fs.existsSync(".git")) {
       console.log("Should be run only in repository root");
       return 1;
@@ -757,7 +757,7 @@ export default class MDocsRepository {
 }
 
 if (require.main === module) {
-  MDocsRepository.commandLine();
+  MDocrRepository.commandLine();
 }
 
-export { MDocsRepository };
+export { MDocrRepository, MDocrRepository as MDocsRepository };

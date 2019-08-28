@@ -234,19 +234,35 @@ export function IntroDialog(props) {
       open={true}
       aria-labelledby="responsive-dialog-title"
     >
+      <div>My Logo</div>
       <DialogTitle id="responsive-dialog-title">
         MDocr Repository Editor
       </DialogTitle>
       <DialogContent>
-        <DialogContentText>
-          You can use MDocr to manage your Markdown documents in a Git
-          repository.
-        </DialogContentText>
-        <DialogContentText>Install requirements</DialogContentText>
-        <DialogContentText>...</DialogContentText>
-        <DialogContentText>
-          Launch in your repository: mdocr edit
-        </DialogContentText>
+        <div style={{ display: "flex" }}>
+          <div>
+            <DialogContentText>
+              You can use MDocr to manage your Markdown documents in a Git
+              repository.
+            </DialogContentText>
+            <DialogContentText>Install requirements</DialogContentText>
+            <DialogContentText>...</DialogContentText>
+            <DialogContentText>
+              Launch in your repository: mdocr edit
+            </DialogContentText>
+          </div>
+          <div>
+            <DialogContentText>
+              You can use MDocr to manage your Markdown documents in a Git
+              repository.
+            </DialogContentText>
+            <DialogContentText>Install requirements</DialogContentText>
+            <DialogContentText>...</DialogContentText>
+            <DialogContentText>
+              Launch in your repository: mdocr edit
+            </DialogContentText>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

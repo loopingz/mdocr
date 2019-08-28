@@ -1,12 +1,13 @@
 {
   "name": "mdocr",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Manage your MD with conventional commits",
   "bin": {
     "mdocr": "./lib/mdocr.js"
   },
   "files": [
-    "lib"
+    "lib",
+    "mdocr.css"
   ],
   "scripts": {
     "test": "nyc mocha --recursive --exit --timeout=100000 -r ts-node/register src/**/*.spec.ts"
