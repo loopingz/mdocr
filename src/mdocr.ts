@@ -12,6 +12,7 @@ import * as yaml from "yaml";
 import * as mkdirp from "mkdirp";
 import * as dateFormat from "dateformat";
 import * as process from "process";
+import * as nunjucks from "nunjucks";
 
 async function Import(cmd, ctx, mdocr) {
   let file = path.dirname(ctx.path) + "/" + cmd.arguments.file;
@@ -65,6 +66,24 @@ async function VersionsTable(cmd, ctx, mdocr) {
   return res;
 }
 
+export abstract class TemplateExtension {
+  private name: string;
+  public tags: string[];
+
+  constructor(name: string, tags: string[]) {
+    this.name = name;
+    this.tags = tags;
+  }
+
+  getName(): string {
+    return this.name;
+  }
+
+  abstract parse(parser, nodes, lexer);
+
+  abstract run(context, url, body, errorBody);
+}
+
 //analyse({ path: "drafts/policies/acceptable-usage-policy.md" });
 /**
  * Main Class for MDocs
@@ -75,6 +94,7 @@ export default class MDocsRepository {
   protected cssPath: string;
   protected cssContent: string;
   protected publishers: any[] = [];
+  protected buildContext: any = {};
   protected commands: any = {
     Import,
     CurrentVersion,
@@ -87,6 +107,7 @@ export default class MDocsRepository {
   protected currentUser: string;
   protected releasing: boolean = false;
   protected increment: number = 0;
+  protected nunjucks: any;
   /**
    *
    * @param rootPath Path to the git repository of documents
@@ -119,12 +140,13 @@ export default class MDocsRepository {
     if (this.config.pdf) {
       this.publishers.push(this.pdf.bind(this));
     }
-    
+
     this.cssPath = path.join(process.cwd(), "mdocr.css");
     if (!fs.existsSync(this.cssPath)) {
       this.cssPath = path.join(__dirname, "..", "mdocr.css");
     }
     this.cssContent = fs.readFileSync(this.cssPath).toString();
+    this.nunjucks = nunjucks.configure({ autoescape: true });
   }
 
   addCommand(command, plugin) {
@@ -258,7 +280,25 @@ export default class MDocsRepository {
       }
     }
     result += str;
-    return result;
+    try {
+      this.buildContext.document = file;
+      return this.nunjucks.renderString(result, this.buildContext);
+    } catch (err) {
+      console.log(err);
+      return result;
+    }
+  }
+
+  addTemplateExtension(ext: TemplateExtension) {
+    this.nunjucks.addExtension(ext.getName(), ext);
+  }
+
+  addTemplateFilter(name: string, fct: any, asyncFct: boolean = false) {
+    this.nunjucks.addFilter(name, fct, asyncFct);
+  }
+
+  addBuildContext(ctx: any) {
+    this.buildContext = { ...this.buildContext, ...ctx };
   }
 
   getSourceFromTarget(target) {
@@ -430,7 +470,7 @@ export default class MDocsRepository {
         remarkable: {
           preset: "commonmark",
           plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
-          syntax: ['table']
+          syntax: ["table"]
         }
       })
         .from.string(str)
@@ -447,7 +487,7 @@ export default class MDocsRepository {
   async pdf(file) {
     const through = require("through");
     let html;
-    
+
     await new Promise(resolve => {
       markdownpdf({
         preProcessHtml: () => {
@@ -460,13 +500,16 @@ export default class MDocsRepository {
         remarkable: {
           preset: "commonmark",
           plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
-          syntax: ['table']
+          syntax: ["table"]
         }
       })
         .from(file.target)
         .to(file.published.replace(/\.md/, ".pdf"), resolve);
     });
-    fs.writeFileSync(file.published.replace(/\.md/, ".html"), `<style>${this.cssContent}</style>${html}`);
+    fs.writeFileSync(
+      file.published.replace(/\.md/, ".html"),
+      `<style>${this.cssContent}</style>${html}`
+    );
     return;
   }
 
@@ -715,21 +758,3 @@ if (require.main === module) {
 }
 
 export { MDocsRepository };
-/*
-// PDF to S3
-drepo.addPublisher(async file => {
-  let pdfFile = file.publishedFile.replace(/\.md/, ".pdf");
-  let key = pdfFile.replace(drepo.config.publishedDir, "");
-  return;
-  //await drepo.pdf(src);
-  let s3 = new (require("aws-sdk/clients/s3"))();
-  // await s3.putObject
-  await s3
-    .putObject({
-      Body: fs.readFileSync(pdfFile),
-      Bucket: "",
-      Key: pdfFile.replace(drepo.config.publishedDir, "")
-    })
-    .promise();
-});
-*/

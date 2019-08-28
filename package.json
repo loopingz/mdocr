@@ -22,6 +22,7 @@
     "glob-fs": "^0.1.7",
     "markdown-pdf": "^10.0.0",
     "mkdirp": "^0.5.1",
+    "nunjucks": "^3.2.0",
     "parse5": "^5.1.0",
     "react-diff-view": "^2.2.0",
     "remarkable-meta": "^1.0.1",
