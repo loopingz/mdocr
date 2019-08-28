@@ -13,6 +13,7 @@ import * as mkdirp from "mkdirp";
 import * as dateFormat from "dateformat";
 import * as process from "process";
 import * as nunjucks from "nunjucks";
+import * as open from "open";
 
 async function Import(cmd, ctx, mdocr) {
   let file = path.dirname(ctx.path) + "/" + cmd.arguments.file;
@@ -555,7 +556,7 @@ export default class MDocsRepository {
     }
   }
 
-  async edit(url = "http://localhost:3000") {
+  async edit(url = "https://mdocr.loopingz.com") {
     let packageInfo = require("../package.json");
     return new Promise(resolve => {
       const http = require("http");
@@ -740,11 +741,13 @@ export default class MDocsRepository {
       })
       .command({
         command: "edit",
-        builder: yargs => yargs.boolean("url"),
+        builder: yargs => yargs.string("url"),
         desc: "Launch the editor",
         handler: async argv => {
+          argv.url = argv.url || "https://mdocr.loopingz.com";
           await drepo.init();
-          await drepo.edit();
+          open(argv.url);
+          await drepo.edit(argv.url);
         }
       })
       .demandCommand()
