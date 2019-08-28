@@ -186,7 +186,6 @@ export default class MDocrRepository {
       this.files[files[i]] = await this.analyse(files[i]);
 
       if (status.indexOf(this.files[files[i]].gitPath) >= 0) {
-        console.log("forcing to dirty");
         this.files[files[i]].isDirty = true;
       }
 
@@ -221,6 +220,12 @@ export default class MDocrRepository {
       file.hasMeta = true;
     } else {
       file.hasMeta = false;
+    }
+    if (!file.meta.Title) {
+      let match = content.match(/# ([^\n]*)/);
+      if (match) {
+        file.meta.Title = match[1];
+      }
     }
     file.commits = (await this.getCommits(file.gitPath)).filter(i => {
       if (i.release) {
