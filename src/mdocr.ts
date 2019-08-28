@@ -171,6 +171,8 @@ export default class MDocrRepository {
     } else {
       this.increment = 1;
     }
+    let cwd = process.cwd();
+    process.chdir(this.rootPath);
     let files = this.config.files
       .map(file => {
         return glob({ gitignore: true })
@@ -191,6 +193,7 @@ export default class MDocrRepository {
       this.targets[this.files[files[i]].gitTarget] = files[i];
       this.gitFiles[this.files[files[i]].gitPath] = files[i];
     }
+    process.chdir(cwd);
   }
 
   async analyse(filePath) {
@@ -205,11 +208,16 @@ export default class MDocrRepository {
     }
     let foundRelease = false;
     file.meta = {};
-    let content = fs.readFileSync(file.path).toString();
+    let content = fs.readFileSync(file.absPath).toString();
     if (content.startsWith("---")) {
       let y = content.substr(3);
       y = y.substr(0, y.indexOf("---"));
       file.meta = yaml.parse(y);
+      if (file.meta.Versions) {
+        file.meta.Versions.sort((a, b) => {
+          return -1 * semver.compare(a.Id, b.Id);
+        });
+      }
       file.hasMeta = true;
     } else {
       file.hasMeta = false;
@@ -234,7 +242,7 @@ export default class MDocrRepository {
   }
 
   async processFile(file) {
-    return this.processContent(fs.readFileSync(file.path).toString(), file);
+    return this.processContent(fs.readFileSync(file.absPath).toString(), file);
   }
 
   async processContent(str, file) {
