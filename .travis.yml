@@ -4,12 +4,20 @@ addons:
     organization: loopingz-github
 node_js:
   - "10"
-script:
-  - npm run test
+before_install:
+  # set up awscli packages
+  - pip install --user awscli
+jobs:
+  include:
+    - stage: test
+      script: npm run test
+    - stage: update-ui # require the branch name to be master (note for PRs this is the base branch name)
+      if: branch = master
+      script:
+        - yarn editor-build
+        - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
 after_success:
   - sonar-scanner
-before_deploy:
-  - npm run build
 deploy:
   provider: npm
   email: rcattiau@loopingz.com
