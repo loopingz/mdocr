@@ -135,8 +135,8 @@ Version: <CurrentVersion />
     assert.equal(called[1].nextVersion, "1.1.0");
     assert.equal(called[2].nextVersion, "1.0.0");
     let content = fs.readFileSync("./test/data/build/docs/test.md").toString();
-    assert.notEqual(content.match(/Imported: 1\.0\.0/g), undefined);
-    assert.notEqual(content.match(/Version: 1\.0\.0/g), undefined);
+    assert.notEqual(content.match(/Imported: 1\.0\.0/g), null);
+    assert.notEqual(content.match(/Version: 1\.0\.0/g), null);
 
     await this.git.commit("feature: first commit");
     this.appendFile("./test/data/drafts/docs/test.md", "patch versioned");

@@ -16,7 +16,7 @@ import * as nunjucks from "nunjucks";
 import * as open from "open";
 
 async function Import(cmd, ctx, mdocr) {
-  let file = path.dirname(ctx.path) + "/" + cmd.arguments.file;
+  let file = path.dirname(ctx.absPath) + "/" + cmd.arguments.file;
   if (fs.existsSync(file)) {
     return await mdocr.processContent(fs.readFileSync(file).toString(), ctx);
   }
@@ -114,7 +114,9 @@ export default class MDocrRepository {
    * @param rootPath Path to the git repository of documents
    */
   constructor(config: any = {}) {
-    this.rootPath = path.normalize(config.rootPath || process.cwd());
+    this.rootPath = path.resolve(
+      path.normalize(config.rootPath || process.cwd())
+    );
     // Initiate our Git client
     this.git = doAsync(simpleGit(this.rootPath));
     // Read package.json from the repository
@@ -136,13 +138,13 @@ export default class MDocrRepository {
     });
     this.config.buildDir = path.normalize(this.config.buildDir || "build/");
     this.config.publishedDir = path.normalize(
-      this.config.publishedDir || "published/"
+      path.join(this.rootPath, this.config.publishedDir || "published/")
     );
     if (this.config.pdf) {
       this.publishers.push(this.pdf.bind(this));
     }
 
-    this.cssPath = path.join(process.cwd(), "mdocr.css");
+    this.cssPath = path.join(this.rootPath, "mdocr.css");
     if (!fs.existsSync(this.cssPath)) {
       this.cssPath = path.join(__dirname, "..", "mdocr.css");
     }
@@ -173,26 +175,29 @@ export default class MDocrRepository {
     }
     let cwd = process.cwd();
     process.chdir(this.rootPath);
-    let files = this.config.files
-      .map(file => {
-        return glob({ gitignore: true })
-          .readdirSync(path.relative(".", file))
-          .join("|");
-      })
-      .join("|")
-      .split("|");
-    let status = (await this.git.status()).files.map(i => i.path);
-    for (let i in files) {
-      this.files[files[i]] = await this.analyse(files[i]);
+    try {
+      let files = this.config.files
+        .map(file => {
+          return glob({ gitignore: true })
+            .readdirSync(path.relative(".", file))
+            .join("|");
+        })
+        .join("|")
+        .split("|");
+      let status = (await this.git.status()).files.map(i => i.path);
+      for (let i in files) {
+        this.files[files[i]] = await this.analyse(files[i]);
 
-      if (status.indexOf(this.files[files[i]].gitPath) >= 0) {
-        this.files[files[i]].isDirty = true;
+        if (status.indexOf(this.files[files[i]].gitPath) >= 0) {
+          this.files[files[i]].isDirty = true;
+        }
+
+        this.targets[this.files[files[i]].gitTarget] = files[i];
+        this.gitFiles[this.files[files[i]].gitPath] = files[i];
       }
-
-      this.targets[this.files[files[i]].gitTarget] = files[i];
-      this.gitFiles[this.files[files[i]].gitPath] = files[i];
+    } finally {
+      process.chdir(cwd);
     }
-    process.chdir(cwd);
   }
 
   async analyse(filePath) {
@@ -381,16 +386,16 @@ export default class MDocrRepository {
       let y = yaml.stringify(src.meta);
       if (src.hasMeta) {
         fs.writeFileSync(
-          src.path,
+          src.absPath,
           fs
-            .readFileSync(src.path)
+            .readFileSync(src.absPath)
             .toString()
             .replace(/---[\s\S]*---/, `---\n${y}---`)
         );
       } else {
         fs.writeFileSync(
-          src.path,
-          `---\n${y}---\n` + fs.readFileSync(src.path).toString()
+          src.absPath,
+          `---\n${y}---\n` + fs.readFileSync(src.absPath).toString()
         );
       }
     }
