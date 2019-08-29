@@ -92,7 +92,7 @@ export default function App() {
   const classes = useStyles();
 
   if (!mdocr) {
-    return <IntroDialog onMdocr={setMdocr} url={url} />;
+    return <IntroDialog uiVersion={commit} onMdocr={setMdocr} url={url} />;
   }
 
   const getPreviewContent = async prev => {
@@ -215,6 +215,7 @@ export default function App() {
   if (!current && mdocr) {
     return (
       <WelcomeDialog
+        uiVersion={commit}
         mdocr={mdocr}
         onChange={async value => {
           setCurrent(value);

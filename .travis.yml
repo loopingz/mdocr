@@ -15,6 +15,7 @@ jobs:
       if: branch = master
       script:
         - cd editor/ && yarn && cd ..
+        - sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
         - CI=false yarn editor-build # Need to remove CI as we have warning for PDF.js https://github.com/wojtekmaj/react-pdf/issues/280
         - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
 after_success:

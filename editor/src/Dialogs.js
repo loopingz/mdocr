@@ -239,6 +239,9 @@ export function IntroDialog(props) {
         <div style={{ display: "flex" }}>
           <div>
             <DialogContentText>
+              MDocr Editor Version: {props.uiVersion}
+            </DialogContentText>
+            <DialogContentText>
               You can use MDocr to manage your Markdown documents in a Git
               repository.
             </DialogContentText>
