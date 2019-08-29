@@ -634,6 +634,7 @@ export default class MDocrRepository {
               res.end();
               resolve();
             } else if (req.url === "/mdocr") {
+              await this.init();
               res.write(
                 JSON.stringify({
                   files: this.files,

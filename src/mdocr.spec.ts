@@ -3,9 +3,37 @@ import * as assert from "assert";
 import * as mkdirp from "mkdirp";
 import * as simpleGit from "simple-git";
 import * as doAsync from "doasync";
-import { MDocsRepository } from "./mdocr";
+import { MDocsRepository, TemplateExtension } from "./mdocr";
 import * as fs from "fs";
 import * as rimraf from "rimraf";
+import * as fetch from "node-fetch";
+
+class TestExtension extends TemplateExtension {
+  constructor() {
+    super("testExt", ["upperblock"]);
+  }
+
+  parse(parser, nodes, lexer) {
+    var tok = parser.nextToken();
+
+    // parse the args and move after the block end. passing true
+    // as the second arg is required if there are no parentheses
+    var args = parser.parseSignature(null, true);
+    parser.advanceAfterBlockEnd(tok.value);
+
+    // parse the body and possibly the error block, which is optional
+    var body = parser.parseUntilBlocks("error", "endupperblock");
+
+    parser.advanceAfterBlockEnd();
+
+    // See above for notes about CallExtension
+    return new nodes.CallExtension(this, "run", args, [body]);
+  }
+
+  run(context, body) {
+    return body().toUpperCase();
+  }
+}
 
 const ImportContent: string = `
 This is my import file
@@ -200,19 +228,108 @@ Version: <CurrentVersion />
     );
   }
 
-  //@test
-  async buildCommandLine() {
+  async ajax(url, method = "GET", format = "text", body = "") {
+    let res = await fetch(`http://localhost:18181${url}`, {
+      method,
+      body,
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+    if (format === "raw") {
+      return res;
+    }
+    return await res[format]();
+  }
+
+  async pause(ms: number = 1000) {
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  @test
+  async testServerAndExtension() {
+    this.mdocr.addTemplateExtension(new TestExtension());
+    this.mdocr.addTemplateFilter("myFilter", str => {
+      return (str || "").toLowerCase();
+    });
+    this.mdocr.addBuildContext({ myctx: "To 90 percent and More" });
     // Not yet ready the chdir seems to generate issue with git spawn
     // Build
     await this.initScenario();
-    // Fake process
-    let cur = process.cwd();
-    let argv = process.argv;
-    process.chdir("./test/data");
-    process.argv = ["mdocr", "build"];
-    await MDocsRepository.commandLine();
-    // Reset normal process
-    process.argv = argv;
-    process.chdir(cur);
+    await this.mdocr.init();
+    this.mdocr.edit();
+    // Wait for the server to start
+    await this.pause(500);
+
+    let mdocr = await this.ajax("/mdocr", "GET", "json");
+    assert.equal(mdocr.path.endsWith("/test/data"), true);
+    assert.equal(mdocr.isDirty, false);
+
+    let text = fs.readFileSync("./test/data/drafts/docs/test.md").toString();
+    assert.equal(text, await this.ajax("/drafts/drafts/docs/test.md"));
+    text +=
+      " {% upperblock %} this Should be uppercase {% endupperblock %}\n{{ myctx | myFilter }}\n<CurrentVersion />\n";
+    text += " HTTP UPDATE";
+    await this.ajax("/drafts/drafts/docs/test.md", "PUT", "text", text);
+
+    assert.equal(text, await this.ajax("/drafts/drafts/docs/test.md"));
+    assert.equal(text, fs.readFileSync("./test/data/drafts/docs/test.md"));
+
+    mdocr = await this.ajax("/mdocr", "GET", "json");
+    assert.equal(mdocr.isDirty, true);
+
+    let result = await this.ajax("/changes", "GET");
+    assert.equal(result.indexOf("+ HTTP UPDATE") >= 0, true);
+
+    let md = await this.ajax("/build/drafts/docs/test.md");
+    let html = await this.ajax("/html/drafts/docs/test.md");
+    let pdf = await this.ajax("/pdf/drafts/docs/test.md");
+
+    // The block parsing should arrive
+    assert.equal(md.indexOf("THIS SHOULD BE UPPERCASE") >= 0, true);
+    // The context should be "To 90 percent and More" then the filter to lower case should apply
+    assert.equal(md.indexOf("to 90 percent and more") >= 0, true);
+
+    // Ensure we have CSS and a SNAPSHOT
+    assert.equal(html.match(/font-face.*Imported: 1.0.0-SNAPSHOT/), null);
+    // Ensure PDF is not empty
+    assert.notEqual(pdf, "");
+
+    await this.ajax(
+      "/commit",
+      "PUT",
+      "text",
+      JSON.stringify({ message: "feature: BREAKING i want my 80" })
+    );
+
+    result = await this.ajax("/release", "GET");
+    assert.equal(result.indexOf("+ HTTP UPDATE") >= 0, true);
+
+    await this.ajax("/release", "PUT");
+
+    await this.ajax(
+      "/drafts/drafts/docs/test.md",
+      "PUT",
+      "text",
+      fs.readFileSync("./test/data/drafts/docs/test.md") + "\n2nd version"
+    );
+
+    result = await this.ajax("/changes", "GET");
+    assert.equal(result.indexOf("1.0.1-SNAPSHOT") >= 0, true);
+    result = await this.ajax("/changes?incr=10", "GET");
+    assert.equal(result.indexOf("1.1.0-SNAPSHOT") >= 0, true);
+    result = await this.ajax("/changes?incr=100", "GET");
+    assert.equal(result.indexOf("2.0.0-SNAPSHOT") >= 0, true);
+
+    let res = await this.ajax("/plop404", "PUT", "raw");
+    assert.equal(res.status, 404);
+    res = await this.ajax("/plop404", "POST", "raw");
+    assert.equal(res.status, 404);
+    res = await this.ajax("/plop404", "GET", "raw");
+    assert.equal(res.status, 404);
+    res = await this.ajax("/plop404", "OPTIONS", "raw");
+    assert.equal(res.status, 200);
+    // Stop the server
+    await fetch("http://localhost:18181/stop");
   }
 }
