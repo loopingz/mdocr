@@ -5,7 +5,6 @@ addons:
 node_js:
   - "10"
 before_install:
-  # set up awscli packages
   - pip install --user awscli
 jobs:
   include:
@@ -13,19 +12,19 @@ jobs:
       script: npm run test
       after_success:
         - sonar-scanner
-    - stage: update-ui # require the branch name to be master (note for PRs this is the base branch name)
+      deploy:
+        provider: npm
+        email: rcattiau@loopingz.com
+        skip_cleanup: true
+        tag: next
+        on:
+          tags: true
+        api_key:
+          secure: aDbgJbUgN9nAes9LY346HcOOsECibEZm7n1aNwH4ubpbi1yIFB2Q0LtNoEQwC1oP1WcbmYpwsNbL32CvH9DAVxKttjWSE0ULjlacg/Gmd/a8gN5Tu8jxxHquab2dd2KtpOD+QOTkC8jWWGCRAqbLEO+WusX8dYPWYq3U13VqfDK9tpijntylsMiLrlmWkoETzgtKvjm8Y5FC4kOM1FXHS+9hKtSJE+dG+/8lTpA+V3VJRIBe9jAVNB4Ijl7mGHh0pqBFsEhP08Jcb5iuKFNtFphoLWH7hEeKPlpQ77VctO6BP/7XG4tMJsxl369tAGR/hCFREch5ZN7SeQyj7o3CJw6ygI7b53+LAbOCIU7+zSqlGitxCHXaMBYFyGsSLTVipdzb0OXCtHOqjmoGtCM/eNIzoGjf7c4i3Zc2DmtTGu9YQtwfkChgt7dX4hcuP/P7ayQ7xRqg2y+p5CEQtMRAFN5YnMWitbPHWRsC1eECrGuZlSOkRLZw+YxCktOBb1llGLTI4ZYu1lEja7vEJmAQJQyiVvjtDkcR+8UkNFRa914HKSpUoLUJUK+MwliXJpLLrrKLOtvRsW9UsuaYYENDn+/CN3XqZ/yMx/d5CP4zac5P5xuBs6KTxHH1tL8V/2/8uJxyLvXwhNKKyMSnmzf4u4HU/0Q6EKVJOCc9fMSXGbo=
+    - stage: update-ui
       if: branch = master
       script:
         - cd editor/ && yarn && cd ..
         - sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
-        - CI=false yarn editor-build # Need to remove CI as we have warning for PDF.js https://github.com/wojtekmaj/react-pdf/issues/280
+        - CI=false yarn editor-build
         - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
-deploy:
-  provider: npm
-  email: rcattiau@loopingz.com
-  skip_cleanup: true
-  tag: next
-  on:
-    tags: true
-  api_key:
-    secure: sDOa1vViedYzQLPEolBDUz+sJAcfj8Hb/UoLmvGnc2dFZ5QrLU7h83W/c615HlzvvJh6KV5Lse9VvIhoJbVZ5FMqM8ZyDdbz97bjTGqnxvw9SpLq6CXcKGj8Tpmq/uVvi/qV+FbgGX3XtKwHmSaqwa+fl9xDaFnjPf6tFXNTUXbSXTiz7+NeUYK9JCyFE6ARmoAlg7ljhrqwyPR8KGAFYgceMm4UumFAd/63JNTw1bWkaI30xEW+ezKJz2XdFzQ+yq3/T9DDV8x5ckYzYw5FSyycehjJVgOasrwhIcPnEhAu/SfJJEPYzAaOmXMCSEeX5Oct3e8W4s0/4WOgzuvHoTRGX1dg47rLeoLGY/eB9WXs44TvLeoat0E7s20ISMC4h/PJuMSYC0CBMvuSTKiFNSBPuaczdQgs0Qtwnt7hExRA+G+N9W5DGmv9AquMS2Iht+iRnPCepuTtYlgViwqFZQ892FYGIr/L9vNo+Rgvz8WSYkG+utqVvplSH3s7CPNebq3dFPcAS/4EEfaVELKA0gzC3zzRq8N08qofajivYFTU5VLCZX2PDciy3+0+7N2UAvGljp0luuTKmYcPsEzs1lveRHYF4j732kQLoE1yfWgxXXzOonRMbW7kGQrwEXDrN2iPW37RchdNHTpUowea2UUYDL0Nq+mPPiUDlgJmj1E=
