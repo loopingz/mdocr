@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/loopingz/mdocr/compare/v1.0.2...v1.1.0) (2019-08-29)
+
+
+### Features
+
+* use the conventional feat: and feature: ([3f77473](https://github.com/loopingz/mdocr/commit/3f77473))
+
 ### 1.0.2 (2019-08-29)
 
 
