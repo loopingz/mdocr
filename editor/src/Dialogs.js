@@ -53,7 +53,11 @@ function getVersionIncrement(message) {
   let incr = 1;
   if (message.indexOf("BREAKING") >= 0) {
     incr = 100;
-  } else if (message.startsWith("feature:")) {
+  } else if (
+    message.startsWith("feature:") ||
+    message.startsWith("feat:") ||
+    message.startsWith("feat(")
+  ) {
     incr = 10;
   }
   if (message.startsWith("release:")) {

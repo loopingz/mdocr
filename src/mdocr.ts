@@ -465,7 +465,11 @@ export default class MDocrRepository {
     let incr = 1;
     if (message.indexOf("BREAKING") >= 0) {
       incr = 100;
-    } else if (message.startsWith("feature:")) {
+    } else if (
+      message.startsWith("feat:") ||
+      message.startsWith("feature:") ||
+      message.startsWith("feat(")
+    ) {
       incr = 10;
     }
     if (message.startsWith("release:")) {
@@ -620,7 +624,7 @@ export default class MDocrRepository {
               if (match[1] == 100) {
                 msg = "BREAKING";
               } else if (match[1] == 10) {
-                msg = "feature:";
+                msg = "feat:";
               }
               res.writeHead(200, {
                 "Content-Type": "text/plain",

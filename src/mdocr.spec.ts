@@ -115,7 +115,7 @@ Version: <CurrentVersion />
     );
     await this.git.add("drafts/docs/*.md");
     await this.git.add("imports/*.md");
-    await this.git.commit("feature: first commit");
+    await this.git.commit("feat: first commit");
     fs.writeFileSync(
       "./test/data/drafts/docs/test.md",
       `
@@ -166,16 +166,16 @@ Version: <CurrentVersion />
     assert.notEqual(content.match(/Imported: 1\.0\.0/g), null);
     assert.notEqual(content.match(/Version: 1\.0\.0/g), null);
 
-    await this.git.commit("feature: first commit");
+    await this.git.commit("feat: first commit");
     this.appendFile("./test/data/drafts/docs/test.md", "patch versioned");
     await this.git.add("drafts/docs/test.md");
     await this.git.commit("fix: should increase patch version");
     this.appendFile("./test/data/drafts/docs/test2.md", "minor versioned");
     await this.git.add("drafts/docs/test2.md");
-    await this.git.commit("feature: should increase minor version");
+    await this.git.commit("feat(scope): should increase minor version");
     this.appendFile("./test/data/drafts/docs/test3.md", "major versioned");
     await this.git.add("drafts/docs/test3.md");
-    await this.git.commit("feature: BREAKING to major");
+    await this.git.commit("feature: BREAKING to major"); // For retro
 
     called.splice(0, 3);
     await this.mdocr.init();
@@ -299,7 +299,7 @@ Version: <CurrentVersion />
       "/commit",
       "PUT",
       "text",
-      JSON.stringify({ message: "feature: BREAKING i want my 80" })
+      JSON.stringify({ message: "feat: BREAKING i want my 80" })
     );
 
     result = await this.ajax("/release", "GET");
