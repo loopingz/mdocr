@@ -14,6 +14,7 @@ jobs:
     - stage: update-ui # require the branch name to be master (note for PRs this is the base branch name)
       if: branch = master
       script:
+        - cd editor/ && yarn && cd ..
         - yarn editor-build
         - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
 after_success:
