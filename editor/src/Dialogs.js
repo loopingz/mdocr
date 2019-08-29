@@ -2,7 +2,6 @@ import React from "react";
 
 import Slide from "@material-ui/core/Slide";
 import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogContentText from "@material-ui/core/DialogContentText";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -17,7 +16,6 @@ import TextField from "@material-ui/core/TextField";
 import { parseDiff, Diff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import { useTheme } from "@material-ui/core/styles";
 import FileSelector from "./FileSelector";
 
 const useStyles = makeStyles(theme => ({
@@ -227,7 +225,6 @@ async function checkMdocr(url, callback) {
 
 export function IntroDialog(props) {
   checkMdocr(props.url, props.onMdocr);
-  const theme = useTheme();
   return (
     <Dialog
       fullScreen={true}

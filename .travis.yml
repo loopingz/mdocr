@@ -15,7 +15,7 @@ jobs:
       if: branch = master
       script:
         - cd editor/ && yarn && cd ..
-        - yarn editor-build
+        - CI=false yarn editor-build # Need to remove CI as we have warning for PDF.js https://github.com/wojtekmaj/react-pdf/issues/280
         - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
 after_success:
   - sonar-scanner

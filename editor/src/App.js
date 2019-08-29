@@ -27,6 +27,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
   pdfjs.version
 }/pdf.worker.js`;
 
+const commit = "#COMMIT#";
+
 const useStyles = makeStyles(theme => ({
   progress: {
     margin: theme.spacing(2)
