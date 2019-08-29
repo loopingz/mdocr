@@ -10,7 +10,7 @@ import PublishIcon from "@material-ui/icons/Publish";
 import SearchIcon from "@material-ui/icons/Search";
 import CommitIcon from "mdi-material-ui/SourceCommitLocal";
 import SplitPane from "react-split-pane";
-import ReactMde from "react-mde";
+import ReactMde, { commands } from "react-mde";
 import "react-mde/lib/styles/css/react-mde-all.css";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import FileSelector from "./FileSelector";
@@ -77,6 +77,7 @@ export default function App() {
   const url = "http://localhost:18181";
   const [value, setValue] = React.useState("");
   const [meta, setMeta] = React.useState("");
+  const [displayMeta, setDisplayMeta] = React.useState(false);
   const [current, setCurrent] = React.useState(null);
   const [preview, setPreview] = React.useState(null);
   const [numPages, setNumPages] = React.useState(0);
@@ -164,9 +165,15 @@ export default function App() {
       clearTimeout(updateInterval);
     }
     updateInterval = setTimeout(async () => {
+      let body;
+      if (displayMeta) {
+        body = val;
+      } else {
+        body = meta + val;
+      }
       await fetch(`${url}/drafts/${current.gitPath}`, {
         method: "PUT",
-        body: meta + val
+        body
       });
       setMdocr({ ...mdocr, isDirty: true });
       if (preview) {
@@ -214,7 +221,28 @@ export default function App() {
       />
     );
   }
-
+  let listCommands = commands.getDefaultCommands();
+  listCommands.push({
+    commands: [
+      {
+        name: "metadata",
+        buttonProps: {
+          "aria-label": "Display Metadata",
+          color: "#000",
+          title: displayMeta ? "Hide Meta" : "Display Meta"
+        },
+        icon: () => <div>Display Meta</div>,
+        execute: (state0: TextState, api: TextApi) => {
+          setDisplayMeta(!displayMeta);
+        },
+        keyCommand: "meta"
+      }
+    ]
+  });
+  let val = value;
+  if (displayMeta) {
+    val = meta + value;
+  }
   return (
     <div>
       <SplitPane
@@ -227,9 +255,10 @@ export default function App() {
       >
         <div>
           <ReactMde
-            value={value}
+            value={val}
             onChange={onMarkdownChange}
             minEditorHeight="inherit"
+            commands={listCommands}
             generateMarkdownPreview={async markdown => {
               if (!current) {
                 return "";
