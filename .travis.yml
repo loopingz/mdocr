@@ -11,6 +11,8 @@ jobs:
   include:
     - stage: test
       script: npm run test
+      after_success:
+        - sonar-scanner
     - stage: update-ui # require the branch name to be master (note for PRs this is the base branch name)
       if: branch = master
       script:
@@ -18,8 +20,6 @@ jobs:
         - sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
         - CI=false yarn editor-build # Need to remove CI as we have warning for PDF.js https://github.com/wojtekmaj/react-pdf/issues/280
         - aws s3 sync editor/build/ s3://mdocr.loopingz.com/
-after_success:
-  - sonar-scanner
 deploy:
   provider: npm
   email: rcattiau@loopingz.com
