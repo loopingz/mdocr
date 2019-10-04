@@ -565,7 +565,11 @@ export default class MDocrRepository {
   }
 
   async getRemoteRepository() {
-    return (await this.git.listRemote(["--get-url"])).trim();
+    try {
+      return (await this.git.listRemote(["--get-url"])).trim();
+    } catch (err) {
+      return "";
+    }
   }
 
   async postpublish(onlyPublish: boolean = false, file: string = undefined) {
