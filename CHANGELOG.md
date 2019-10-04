@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.1](https://github.com/loopingz/mdocr/compare/v1.1.0...v1.1.1) (2019-10-04)
+
+
+### Bug Fixes
+
+* crash if no remote ([524aebe](https://github.com/loopingz/mdocr/commit/524aebe))
+* display file when selected from welcome ([4cd36d0](https://github.com/loopingz/mdocr/commit/4cd36d0))
+* Do not display date for -SNAPSHOT ([a2a4013](https://github.com/loopingz/mdocr/commit/a2a4013))
+* improve IntroDialog ([ee8e4a4](https://github.com/loopingz/mdocr/commit/ee8e4a4))
+
 ## [1.1.0](https://github.com/loopingz/mdocr/compare/v1.0.2...v1.1.0) (2019-08-29)
 
 
