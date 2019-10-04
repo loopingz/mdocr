@@ -191,7 +191,7 @@ export function PublishDialog(props) {
         <DiffDialog
           label="Publish new versions"
           filter={file => {
-            return file.newPath.startsWith("build/"); // TODO Should be variable
+            return true || file.newPath.startsWith("current/"); // TODO Should be variable - no filter for now
           }}
           actionLabel="publish"
           diffUrl="/release"
@@ -235,7 +235,13 @@ export function IntroDialog(props) {
       open={true}
       aria-labelledby="responsive-dialog-title"
     >
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: "-50px"
+        }}
+      >
         <img src="mdocR.svg" style={{ width: "200px" }} />
       </div>
       <DialogTitle
