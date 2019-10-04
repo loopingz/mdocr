@@ -235,13 +235,25 @@ export function IntroDialog(props) {
       open={true}
       aria-labelledby="responsive-dialog-title"
     >
-      <div>My Logo</div>
-      <DialogTitle id="responsive-dialog-title">
-        MDocr Repository Editor
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <img src="mdocR.svg" style={{ width: "200px" }} />
+      </div>
+      <DialogTitle
+        id="responsive-dialog-title"
+        style={{ color: "#3399cc", textAlign: "center" }}
+      >
+        Repository Editor
       </DialogTitle>
       <DialogContent>
-        <div style={{ display: "flex" }}>
-          <div>
+        <div style={{ display: "flex", width: "100%", minHeight: "100%" }}>
+          <div
+            style={{
+              borderRight: "2px solid #3399cc",
+              padding: "10px",
+              width: "50%",
+              minHeight: "calc(100% - 260px)"
+            }}
+          >
             <DialogContentText>
               MDocr Editor Version: {props.uiVersion}
             </DialogContentText>
@@ -249,21 +261,45 @@ export function IntroDialog(props) {
               You can use MDocr to manage your Markdown documents in a Git
               repository.
             </DialogContentText>
-            <DialogContentText>Install requirements</DialogContentText>
-            <DialogContentText>...</DialogContentText>
             <DialogContentText>
-              Launch in your repository: mdocr edit
+              <h3>Install requirements</h3>
+              <ul>
+                <li>NodeJS</li>
+                <li>Git client</li>
+                <li>
+                  Install MDocR binary
+                  <pre>npm install -g mdocr</pre>
+                  <span style={{ fontSize: "8px" }}>OR</span>
+                  <pre>yarn global add mdocr</pre>
+                </li>
+              </ul>
+            </DialogContentText>
+            <DialogContentText>
+              <h3>Initiate a repository</h3>
+              <pre>git init</pre>
+            </DialogContentText>
+            <DialogContentText>
+              <h3>Launch in your repository</h3>
+              <pre>mdocr edit</pre>
             </DialogContentText>
           </div>
-          <div>
+          <div style={{ padding: "10px", width: "50%" }}>
             <DialogContentText>
-              You can use MDocr to manage your Markdown documents in a Git
-              repository.
+              MDocR use conventional commits to generate the version of the
+              document. It also give you the ability to pull datas from your own
+              systems to automate some contents
             </DialogContentText>
-            <DialogContentText>Install requirements</DialogContentText>
-            <DialogContentText>...</DialogContentText>
             <DialogContentText>
-              Launch in your repository: mdocr edit
+              <h3>Conventional commits</h3>
+              What is conventional commits?
+            </DialogContentText>
+            <DialogContentText>
+              <h3>Integrations</h3>
+            </DialogContentText>
+            <DialogContentText>
+              <h3>Publish</h3>
+              Once the documents are ready to publish, you can publish and
+              activate the post publish actions
             </DialogContentText>
           </div>
         </div>
