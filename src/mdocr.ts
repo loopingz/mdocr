@@ -53,16 +53,14 @@ async function VersionsTable(cmd, ctx, mdocr) {
     authors.add(mdocr.getCurrentUser());
     versions.unshift({
       Id: ctx.nextVersion + "-SNAPSHOT",
-      Date: dateFormat(Date.now(), "yyyy-mm-dd"),
+      Date: "-",
       Authors: [...authors].join(","), // Creating a unique set of authors
       Reviewer: "N/A"
     });
   }
 
   versions.forEach(version => {
-    res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${
-      version.Reviewer
-    } |\n`;
+    res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${version.Reviewer} |\n`;
   });
   return res;
 }
