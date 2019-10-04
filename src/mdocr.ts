@@ -564,6 +564,10 @@ export default class MDocrRepository {
     }
   }
 
+  async getRemoteRepository() {
+    return (await this.git.listRemote(["--get-url"])).trim();
+  }
+
   async postpublish(onlyPublish: boolean = false, file: string = undefined) {
     for (let i in this.files) {
       let src = this.files[i];
@@ -591,7 +595,6 @@ export default class MDocrRepository {
               resolve();
             });
           });
-          console.log("REQUEST", req.method, req.url);
           // TODO Add referer checks
           res.writeHead(200, {
             "Content-Type": "application/json",
@@ -643,7 +646,7 @@ export default class MDocrRepository {
                   version: packageInfo.version,
                   path: this.rootPath,
                   isDirty: await this.isDirty(),
-                  repository: "git://..."
+                  repository: await this.getRemoteRepository()
                 })
               );
             } else {

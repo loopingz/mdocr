@@ -315,11 +315,19 @@ export function WelcomeDialog(props) {
       open={true}
       aria-labelledby="responsive-dialog-title"
     >
-      <DialogTitle id="responsive-dialog-title">
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <img src="mdocR.svg" style={{ width: "200px" }} />
+      </div>
+      <DialogTitle
+        id="responsive-dialog-title"
+        style={{ color: "#3399cc", textAlign: "center" }}
+      >
         {"Choose a file to edit"}
       </DialogTitle>
       <DialogContent>
         <DialogContentText>
+          Current path: {props.mdocr.path}
+          <br />
           Current repository: {props.mdocr.repository}
         </DialogContentText>
         <DialogContentText>Please select a file</DialogContentText>

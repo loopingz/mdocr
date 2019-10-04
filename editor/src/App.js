@@ -23,9 +23,7 @@ import {
   IntroDialog,
   WelcomeDialog
 } from "./Dialogs";
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${
-  pdfjs.version
-}/pdf.worker.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 const commit = "#COMMIT#";
 
@@ -278,6 +276,7 @@ export default function App() {
                   setCurrent(value);
                   refreshCurrent(value);
                 }}
+                value={current}
               />
               <IconButton color="inherit" onClick={() => setAddMode(true)}>
                 <AddIcon />
