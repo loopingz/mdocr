@@ -45,7 +45,9 @@ async function VersionsTable(cmd, ctx, mdocr) {
     versions.unshift({
       Id: ctx.nextVersion,
       Date: dateFormat(Date.now(), "yyyy-mm-dd"),
-      Authors: [...new Set(ctx.commits.map(i => i.author_name))].join(","), // Creating a unique set of authors
+      Authors: [...new Set(ctx.commits.map(i => i.author_name))]
+        .sort()
+        .join(","), // Creating a unique set of authors
       Reviewer: mdocr.getCurrentUser()
     });
   } else if (ctx.isDirty) {
@@ -54,7 +56,7 @@ async function VersionsTable(cmd, ctx, mdocr) {
     versions.unshift({
       Id: ctx.nextVersion + "-SNAPSHOT",
       Date: "-",
-      Authors: [...authors].join(","), // Creating a unique set of authors
+      Authors: [...authors].sort().join(","), // Creating a unique set of authors
       Reviewer: "N/A"
     });
   }
@@ -124,8 +126,8 @@ export default class MDocrRepository {
         fs.readFileSync(this.rootPath + "/package.json").toString()
       );
     }
-    packageInfo.mdversionflow = packageInfo.mdversionflow || {};
-    this.config = { ...packageInfo.mdversionflow, ...config };
+    packageInfo.mdocr = packageInfo.mdocr || {};
+    this.config = { ...packageInfo.mdocr, ...config };
     this.config.files = this.config.files ||
       packageInfo.files || ["./drafts/**/*.md"];
     this.config.files = this.config.files.map(f => {
@@ -327,7 +329,9 @@ export default class MDocrRepository {
   }
 
   async getDocumentVersion(src) {
-    let Authors = [...new Set(src.commits.map(i => i.author_name))].join(",");
+    let Authors = [...new Set(src.commits.map(i => i.author_name))]
+      .sort()
+      .join(",");
     if (Authors.length === 0) {
       Authors = this.getCurrentUser();
     }
