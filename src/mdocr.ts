@@ -205,11 +205,7 @@ export default class MDocrRepository {
       path: filePath,
       absPath: path.resolve(filePath)
     };
-    if (filePath.startsWith(this.rootPath + "/")) {
-      file.gitPath = filePath.substr(this.rootPath.length + 1);
-    } else {
-      file.gitPath = filePath;
-    }
+    file.gitPath = path.relative(this.rootPath, filePath);
     let foundRelease = false;
     file.meta = {};
     let content = fs.readFileSync(file.absPath).toString();
@@ -221,6 +217,7 @@ export default class MDocrRepository {
         file.meta.Versions.sort((a, b) => {
           return -1 * semver.compare(a.Id, b.Id);
         });
+        file.currentVersion = file.meta.Versions[0].Id;
       }
       file.hasMeta = true;
     } else {
@@ -240,12 +237,14 @@ export default class MDocrRepository {
     });
     file.isDirty = file.commits.length > 0;
     file.nextVersion = await this.getNextVersion(file);
-    file.gitTarget = path.normalize(
-      file.gitPath.replace(/.[^\/]*/, this.config.buildDir)
+    file.gitTarget = path.relative(
+      this.rootPath,
+      path.normalize(file.gitPath.replace(/.[^\/]*/, this.config.buildDir))
     );
     file.target = path.join(this.rootPath, file.gitTarget);
-    file.gitPublished = path.normalize(
-      file.gitPath.replace(/.[^\/]*/, this.config.publishedDir)
+    file.gitPublished = path.relative(
+      this.rootPath,
+      path.normalize(file.gitPath.replace(/.[^\/]*/, this.config.publishedDir))
     );
     file.published = path.join(this.rootPath, file.gitPublished);
     return file;
