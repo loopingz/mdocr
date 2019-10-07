@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.2](https://github.com/loopingz/mdocr/compare/v1.1.1...v1.1.2) (2019-10-07)
+
+
+### Bug Fixes
+
+* ensure correct relative path ([d1157f7](https://github.com/loopingz/mdocr/commit/d1157f7))
+* remove filter on publish diff ([fa348bf](https://github.com/loopingz/mdocr/commit/fa348bf))
+* sort Authors and use mdocr instead of mdversionflow ([36f179a](https://github.com/loopingz/mdocr/commit/36f179a))
+
 ### [1.1.1](https://github.com/loopingz/mdocr/compare/v1.1.0...v1.1.1) (2019-10-04)
 
 
