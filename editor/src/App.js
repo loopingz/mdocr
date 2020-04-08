@@ -1,61 +1,66 @@
-import React from "react";
-import "./App.css";
-import { makeStyles } from "@material-ui/core/styles";
 import AppBar from "@material-ui/core/AppBar";
-import Toolbar from "@material-ui/core/Toolbar";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import IconButton from "@material-ui/core/IconButton";
+import { makeStyles } from "@material-ui/core/styles";
+import Toolbar from "@material-ui/core/Toolbar";
 import AddIcon from "@material-ui/icons/Add";
-import RefreshIcon from "@material-ui/icons/Refresh";
+import DeleteIcon from "@material-ui/icons/Delete";
+import FormatIndentDecreaseIcon from "@material-ui/icons/FormatIndentDecrease";
+import FormatIndentIncreaseIcon from "@material-ui/icons/FormatIndentIncrease";
 import PublishIcon from "@material-ui/icons/Publish";
+import RefreshIcon from "@material-ui/icons/Refresh";
 import SearchIcon from "@material-ui/icons/Search";
 import CommitIcon from "mdi-material-ui/SourceCommitLocal";
-import SplitPane from "react-split-pane";
+import React, { useCallback, useRef } from "react";
 import ReactMde, { commands } from "react-mde";
 import "react-mde/lib/styles/css/react-mde-all.css";
-import CircularProgress from "@material-ui/core/CircularProgress";
-import FileSelector from "./FileSelector";
-import Select from "react-select";
 import { Document, Page, pdfjs } from "react-pdf";
-
+import Select from "react-select";
+import SplitPane from "react-split-pane";
+import "./App.css";
 import {
+  AddDialog,
   CommitDialog,
-  PublishDialog,
+  DeleteConfirmationDialog,
   IntroDialog,
-  WelcomeDialog
+  PublishDialog,
+  WelcomeDialog,
 } from "./Dialogs";
+import FileSelector from "./FileSelector";
+
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
 const commit = "#COMMIT#";
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
   progress: {
-    margin: theme.spacing(2)
+    margin: theme.spacing(2),
   },
   text: {
-    padding: theme.spacing(2, 2, 0)
+    padding: theme.spacing(2, 2, 0),
   },
   paper: {
-    paddingBottom: 50
+    paddingBottom: 50,
   },
   list: {
-    marginBottom: theme.spacing(2)
+    marginBottom: theme.spacing(2),
   },
   subheader: {
-    backgroundColor: theme.palette.background.paper
+    backgroundColor: theme.palette.background.paper,
   },
   dialogAppBar: {
-    position: "relative"
+    position: "relative",
   },
   title: {
     marginLeft: theme.spacing(2),
-    flex: 1
+    flex: 1,
   },
   appBar: {
     top: "auto",
-    bottom: 0
+    bottom: 0,
   },
   grow: {
-    flexGrow: 1
+    flexGrow: 1,
   },
   fabButtons: {
     position: "absolute",
@@ -63,8 +68,8 @@ const useStyles = makeStyles(theme => ({
     top: -30,
     left: 0,
     right: 0,
-    margin: "0 auto"
-  }
+    margin: "0 auto",
+  },
 }));
 
 let updateInterval;
@@ -81,20 +86,53 @@ export default function App() {
   const [current, setCurrent] = React.useState(null);
   const [preview, setPreview] = React.useState(null);
   const [numPages, setNumPages] = React.useState(0);
+  const [previewEnable, setPreviewEnable] = React.useState(false);
   const [previewContent, setPreviewContent] = React.useState(null);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [commitMode, setCommitMode] = React.useState(false);
   const [publishMode, setPublishMode] = React.useState(false);
   const [addMode, setAddMode] = React.useState(false);
-
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState(false);
+  const [previewScrollTop, setPreviewScrollTop] = React.useState(0);
+  const [previewCounter, setPreviewCounter] = React.useState(0);
   const classes = useStyles();
+  const ref = useRef(null);
+  const setRef = useCallback(
+    (node) => {
+      if (window.document.getElementById("preview")) {
+        window.document.getElementById("preview").scrollTop = previewScrollTop;
+      } else if (ref.current) {
+        // Make sure to cleanup any events/references added to the last instance
 
+        ref.current.scrollTop = previewScrollTop;
+      }
+      if (node) {
+        // Check if a node is actually passed. Otherwise node would be null.
+        // You can now do what you need to, addEventListeners, measure, etc.
+      }
+      // Save a reference to the node
+      ref.current = node;
+    },
+    [previewScrollTop]
+  );
   if (!mdocr) {
     return <IntroDialog uiVersion={commit} onMdocr={setMdocr} url={url} />;
   }
 
-  const getPreviewContent = async prev => {
+  const getPreviewContent = async (prev) => {
     if (prev.value === "none") return;
+    if (prev.value === "pdf") {
+      let items = document.getElementsByClassName("react-pdf__Document");
+      if (items.length) {
+        setPreviewScrollTop(items[0].scrollTop);
+      } else {
+        setPreviewScrollTop(0);
+      }
+    } else {
+      let p = document.getElementById("preview");
+      setPreviewScrollTop(p ? p.scrollTop : 0);
+    }
+    setPreviewCounter(previewCounter + 1);
     setPreviewLoading(true);
     let res = await fetch(`${url}/${prev.value}/${current.gitPath}`);
     if (prev.value === "pdf") {
@@ -104,28 +142,47 @@ export default function App() {
     }
     setPreviewLoading(false);
   };
-  let previewElement = (
-    <SearchIcon style={{ width: "128px", height: "128px", color: "#999" }} />
-  );
+  let previewElement = <SearchIcon style={{ width: "128px", height: "128px", color: "#999" }} />;
   let addComponent = false;
   if (previewLoading) {
     addComponent = true;
     previewElement = <CircularProgress className={classes.progress} />;
   } else if (preview && preview.value !== "none") {
     if (preview.value === "build") {
-      previewElement = <pre>{previewContent}</pre>;
+      previewElement = (
+        <pre id="preview" className="buildContent" ref={setRef}>
+          {previewContent}
+        </pre>
+      );
     } else if (preview.value === "html") {
       previewElement = (
         <div
+          id="preview"
           className="previewContent"
+          ref={setRef}
           style={{ padding: 10 }}
-          dangerouslySetInnerHTML={{ __html: previewContent }}
+          dangerouslySetInnerHTML={{ __html: previewContent.replace(/<style>[\w\W]*<\/style>/gm, "") }}
         />
       );
     } else if (preview.value === "pdf") {
       let pages = [];
+      let pagesLoaded = 0;
       for (let i = 1; i <= numPages; i++) {
-        pages.push(<Page id={i} pageNumber={i} />);
+        pages.push(
+          <Page
+            id={i}
+            pageNumber={i}
+            onLoadSuccess={() => {
+              pagesLoaded++;
+              if (pagesLoaded === numPages) {
+                let items = document.getElementsByClassName("react-pdf__Document");
+                if (items.length) {
+                  items[0].scrollTop = previewScrollTop;
+                }
+              }
+            }}
+          />
+        );
       }
       previewElement = (
         <Document
@@ -152,14 +209,14 @@ export default function App() {
           position: "absolute",
           width: "100%",
           bottom: "60px",
-          top: "48px"
+          top: "48px",
         }}
       >
         {previewElement}
       </div>
     );
   }
-  const onMarkdownChange = val => {
+  const onMarkdownChange = (val) => {
     setValue(val);
     if (updateInterval) {
       clearTimeout(updateInterval);
@@ -173,7 +230,7 @@ export default function App() {
       }
       await fetch(`${url}/drafts/${current.gitPath}`, {
         method: "PUT",
-        body
+        body,
       });
       setMdocr({ ...mdocr, isDirty: true });
       if (preview) {
@@ -215,7 +272,7 @@ export default function App() {
       <WelcomeDialog
         uiVersion={commit}
         mdocr={mdocr}
-        onChange={async value => {
+        onChange={async (value) => {
           setCurrent(value);
           refreshCurrent(value);
         }}
@@ -230,37 +287,40 @@ export default function App() {
         buttonProps: {
           "aria-label": "Display Metadata",
           color: "#000",
-          title: displayMeta ? "Hide Meta" : "Display Meta"
+          title: displayMeta ? "Hide Meta" : "Display Meta",
         },
         icon: () => <div>Display Meta</div>,
         execute: (state0: TextState, api: TextApi) => {
           setDisplayMeta(!displayMeta);
         },
-        keyCommand: "meta"
-      }
-    ]
+        keyCommand: "meta",
+      },
+    ],
   });
   let val = value;
   if (displayMeta) {
     val = meta + value;
   }
+  const previewEnableButton = previewEnable ? <FormatIndentDecreaseIcon /> : <FormatIndentIncreaseIcon />;
+  const defaultSize = previewEnable
+    ? window.innerWidth
+    : parseInt(localStorage.getItem("splitPos") || window.innerWidth / 2, 10);
   return (
     <div>
-      <SplitPane
-        split="vertical"
-        defaultSize={parseInt(
-          localStorage.getItem("splitPos") || window.innerWidth / 2,
-          10
-        )}
-        onChange={size => localStorage.setItem("splitPos", size)}
+      <IconButton
+        onClick={() => setPreviewEnable(!previewEnable)}
+        style={{ zIndex: 2, position: "fixed", left: defaultSize - 40 }}
       >
+        {previewEnableButton}
+      </IconButton>
+      <SplitPane split="vertical" defaultSize={defaultSize} onChange={(size) => localStorage.setItem("splitPos", size)}>
         <div>
           <ReactMde
             value={val}
             onChange={onMarkdownChange}
             minEditorHeight="inherit"
             commands={listCommands}
-            generateMarkdownPreview={async markdown => {
+            generateMarkdownPreview={async (markdown) => {
               if (!current) {
                 return "";
               }
@@ -270,9 +330,12 @@ export default function App() {
           />
           <AppBar position="fixed" color="primary" className={classes.appBar}>
             <Toolbar>
+              <IconButton color="inherit" onClick={() => setDeleteConfirmation(true)}>
+                <DeleteIcon />
+              </IconButton>
               <FileSelector
                 drafts={Object.values(mdocr.files)}
-                onChange={async value => {
+                onChange={async (value) => {
                   setCurrent(value);
                   refreshCurrent(value);
                 }}
@@ -282,19 +345,10 @@ export default function App() {
                 <AddIcon />
               </IconButton>
               <div className={classes.grow}>Repository: {mdocr.path}</div>
-              <IconButton
-                disabled={!mdocr.isDirty}
-                color="inherit"
-                onClick={() => setCommitMode(true)}
-              >
+              <IconButton disabled={!mdocr.isDirty} color="inherit" onClick={() => setCommitMode(true)}>
                 <CommitIcon />
               </IconButton>
-              <IconButton
-                edge="end"
-                color="inherit"
-                disabled={mdocr.isDirty}
-                onClick={() => setPublishMode(true)}
-              >
+              <IconButton edge="end" color="inherit" disabled={mdocr.isDirty} onClick={() => setPublishMode(true)}>
                 <PublishIcon />
               </IconButton>
             </Toolbar>
@@ -307,17 +361,18 @@ export default function App() {
               display: "flex",
               height: "44px",
               borderBottom: "1px solid #c8ccd0",
-              borderRadius: "2px 2px 0 0"
+              borderRadius: "2px 2px 0 0",
             }}
           >
             <div style={{ padding: 10 }}>Preview</div>
             <div style={{ paddingRight: 10, paddingTop: 3, flexGrow: 1 }}>
               <Select
                 value={preview}
-                onChange={value => {
+                onChange={(value) => {
                   if (previewInterval) {
                     clearTimeout(previewInterval);
                   }
+                  setPreviewScrollTop(0);
                   setPreview(value);
                   getPreviewContent(value);
                 }}
@@ -326,7 +381,7 @@ export default function App() {
                   { label: "PDF", value: "pdf" },
                   { label: "HTML", value: "html" },
                   { label: "Markdown", value: "build" },
-                  { label: "-", value: "none" }
+                  { label: "-", value: "none" },
                 ]}
               />
             </div>
@@ -350,7 +405,7 @@ export default function App() {
         url={url}
         onAction={async () => {
           await fetch(`${url}/release`, {
-            method: "PUT"
+            method: "PUT",
           });
           await refreshCurrent();
           return true;
@@ -361,14 +416,29 @@ export default function App() {
         open={commitMode}
         onClose={() => setCommitMode(false)}
         url={url}
-        onAction={async message => {
+        onAction={async (message) => {
           await fetch(`${url}/commit`, {
             method: "PUT",
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message }),
           });
           setMdocr({ ...mdocr, isDirty: false });
           return true;
         }}
+      />
+
+      <AddDialog
+        mdocr={mdocr}
+        handleClose={(filename, title) => {
+          setAddMode(false);
+        }}
+        open={addMode}
+      />
+      <DeleteConfirmationDialog
+        handleClose={(validation) => {
+          setDeleteConfirmation(false);
+        }}
+        file={current.path}
+        open={deleteConfirmation}
       />
     </div>
   );
