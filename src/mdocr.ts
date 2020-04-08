@@ -2,85 +2,119 @@
 import * as dateFormat from "dateformat";
 import * as doAsync from "doasync";
 import * as fs from "fs";
-import * as glob from "glob-fs";
 import * as markdownpdf from "markdown-pdf";
-import * as mkdirp from "mkdirp";
-import * as fetch from "node-fetch";
-import * as nunjucks from "nunjucks";
-import * as open from "open";
-import * as parse5 from "parse5";
-import * as path from "path";
-import * as process from "process";
 import * as semver from "semver";
+import * as glob from "glob-fs";
+import * as path from "path";
 import * as simpleGit from "simple-git";
 import * as yaml from "yaml";
-
-async function Import(cmd, ctx, mdocr) {
-  let file = path.dirname(ctx.absPath) + "/" + cmd.arguments.file;
-  if (fs.existsSync(file)) {
-    return await mdocr.processContent(fs.readFileSync(file).toString(), ctx);
-  }
-}
-
-async function CurrentVersion(cmd, ctx, mdocr) {
-  if (mdocr.buildForRelease() && ctx.commits.length > 0) {
-    return ctx.nextVersion;
-  }
-  if (ctx.isDirty || !ctx.meta.Versions) {
-    return ctx.nextVersion + "-SNAPSHOT";
-  } else if (ctx.meta.Versions) {
-    return ctx.meta.Versions[0].Id;
-  }
-}
-
-async function VersionsTable(cmd, ctx, mdocr) {
-  let res = `
-| Version | Date       | Authors     | Reviewers    |
-|-|-|-|-|
-`;
-  ctx.meta.Versions = ctx.meta.Versions || [];
-  let versions = [...ctx.meta.Versions];
-
-  if (mdocr.buildForRelease() && ctx.commits.length > 0) {
-    versions.unshift({
-      Id: ctx.nextVersion,
-      Date: dateFormat(Date.now(), "yyyy-mm-dd"),
-      Authors: [...new Set(ctx.commits.map((i) => i.author_name))].sort().join(","), // Creating a unique set of authors
-      Reviewer: mdocr.getCurrentUser(),
-    });
-  } else if (ctx.isDirty) {
-    let authors = new Set(ctx.commits.map((i) => i.author_name));
-    authors.add(mdocr.getCurrentUser());
-    versions.unshift({
-      Id: ctx.nextVersion + "-SNAPSHOT",
-      Date: "-",
-      Authors: [...authors].sort().join(","), // Creating a unique set of authors
-      Reviewer: "N/A",
-    });
-  }
-
-  versions.forEach((version) => {
-    res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${version.Reviewer} |\n`;
-  });
-  return res;
-}
+import * as process from "process";
+import * as nunjucks from "nunjucks";
+import * as open from "open";
+import * as fetch from "node-fetch";
 
 export abstract class TemplateExtension {
-  private name: string;
+  private __name: string;
   public tags: string[];
+  public mdocr: MDocrRepository;
+  private block: boolean;
 
-  constructor(name: string, tags: string[]) {
-    this.name = name;
+  constructor(name: string, tags: string[], isBlock: boolean = false) {
+    this.__name = name;
     this.tags = tags;
+    this.block = isBlock;
   }
 
   getName(): string {
-    return this.name;
+    return this.__name;
   }
 
-  abstract parse(parser, nodes, lexer);
+  parse(parser, nodes, lexer) {
+    try {
+      // get the tag token
+      var tok = parser.nextToken();
 
-  abstract run(context, url, body, errorBody);
+      // parse the args and move after the block end. passing true
+      // as the second arg is required if there are no parentheses
+      var args = parser.parseSignature(null, true);
+      parser.advanceAfterBlockEnd(tok.value);
+      let body = undefined;
+      if (this.block) {
+        // parse the body and possibly the error block, which is optional
+        body = parser.parseUntilBlocks(`end${tok.value}`);
+        parser.advanceAfterBlockEnd();
+      }
+
+      // See above for notes about CallExtension
+      return new nodes.CallExtension(this, "run", args, [body]);
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  run(context, ...args) {
+    try {
+      return this._run(context, ...args);
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  abstract _run(context, ...args);
+}
+
+class CurrentVersionExtension extends TemplateExtension {
+  constructor() {
+    super("CurrentVersion", ["currentVersion"]);
+  }
+
+  _run({ ctx: { document } }) {
+    if (this.mdocr.buildForRelease() && document.commits.length > 0) {
+      return document.nextVersion;
+    }
+    if (document.isDirty || !document.meta.Versions) {
+      return document.nextVersion + "-SNAPSHOT";
+    } else if (document.meta.Versions) {
+      return document.meta.Versions[0].Id;
+    }
+  }
+}
+
+class VersionsTableExtension extends TemplateExtension {
+  constructor() {
+    super("VersionsTable", ["versionsTable"]);
+  }
+
+  _run({ ctx: { document } }) {
+    let res = `
+| Version | Date       | Authors     | Reviewers    |
+|-|-|-|-|
+`;
+    document.meta.Versions = document.meta.Versions || [];
+    let versions = [...document.meta.Versions];
+    if (this.mdocr.buildForRelease() && document.commits.length > 0) {
+      versions.unshift({
+        Id: document.nextVersion,
+        Date: dateFormat(Date.now(), "yyyy-mm-dd"),
+        Authors: [...new Set(document.commits.map((i) => i.author_name))].sort().join(","), // Creating a unique set of authors
+        Reviewer: this.mdocr.getCurrentUser(),
+      });
+    } else if (document.isDirty) {
+      let authors = new Set(document.commits.map((i) => i.author_name));
+      authors.add(this.mdocr.getCurrentUser());
+      versions.unshift({
+        Id: document.nextVersion + "-SNAPSHOT",
+        Date: "-",
+        Authors: [...authors].sort().join(","), // Creating a unique set of authors
+        Reviewer: "N/A",
+      });
+    }
+
+    versions.forEach((version) => {
+      res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${version.Reviewer} |\n`;
+    });
+    return res;
+  }
 }
 
 //analyse({ path: "drafts/policies/acceptable-usage-policy.md" });
@@ -94,11 +128,6 @@ export default class MDocrRepository {
   protected cssContent: string;
   protected publishers: any[] = [];
   protected buildContext: any = {};
-  protected commands: any = {
-    Import,
-    CurrentVersion,
-    VersionsTable,
-  };
   protected targets: any = {};
   protected gitFiles: any = {};
   protected files: any = {};
@@ -141,11 +170,9 @@ export default class MDocrRepository {
       this.cssPath = path.join(__dirname, "..", "mdocr.css");
     }
     this.cssContent = fs.readFileSync(this.cssPath).toString();
-    this.nunjucks = nunjucks.configure({ autoescape: true });
-  }
-
-  addCommand(command, plugin) {
-    this.commands[command] = plugin;
+    this.nunjucks = nunjucks.configure(this.rootPath, { autoescape: true });
+    this.addTemplateExtension(new CurrentVersionExtension());
+    this.addTemplateExtension(new VersionsTableExtension());
   }
 
   addPublisher(pub) {
@@ -237,62 +264,17 @@ export default class MDocrRepository {
   }
 
   async processFile(file) {
-    return this.processContent(fs.readFileSync(file.absPath).toString(), file);
-  }
-
-  async processContent(str, file) {
-    let result = "";
-    let command;
-    let res;
-    // Remove Markdown metadata by default
-    if (!this.config.keepMeta) {
-      if (str.startsWith("---")) {
-        str = str.substr(3);
-        str = str.substr(str.indexOf("---") + 3);
-      }
-    }
-    // TODO Move to nunjucks template engine: https://mozilla.github.io/nunjucks/
-    while ((res = str.search(/<[^>]*>/)) >= 0) {
-      result += str.substr(0, res);
-      str = str.substr(res + 1);
-      let fullTag = str.substr(0, str.indexOf(">"));
-      let autoClose = fullTag.endsWith("/");
-      let tagName;
-      if (fullTag.indexOf(" ") >= 0) {
-        tagName = fullTag.substr(0, fullTag.indexOf(" "));
-      } else {
-        tagName = fullTag;
-      }
-      if (autoClose) {
-        fullTag = fullTag.substr(0, fullTag.length - 1);
-        // Auto closing tag
-        command = `<${fullTag}></${tagName}>`;
-        str = str.substr(fullTag.length + 2); // Skiping the tag
-      } else {
-        command = "<" + str.substr(0, str.indexOf(`</${tagName}>`)) + `</${tagName}>`;
-        str = str.substr(command.length);
-      }
-      if (this.commands[tagName]) {
-        let cmd = parse5.parseFragment(command);
-        if (cmd.childNodes.length) {
-          cmd = cmd.childNodes[0];
-          cmd.arguments = {};
-          cmd.attrs.forEach((a) => (cmd.arguments[a.name] = a.value));
-          result += (await this.commands[tagName](cmd, file, this)) || "";
-        }
-      }
-    }
-    result += str;
     try {
       this.buildContext.document = file;
-      return this.nunjucks.renderString(result, this.buildContext);
+      return this.nunjucks.render(file.gitPath, this.buildContext);
     } catch (err) {
       console.log(err);
-      return result;
+      return "";
     }
   }
 
   addTemplateExtension(ext: TemplateExtension) {
+    ext.mdocr = this;
     this.nunjucks.addExtension(ext.getName(), ext);
   }
 
@@ -313,7 +295,7 @@ export default class MDocrRepository {
   }
 
   async getDocumentVersion(src) {
-    let Authors = [...new Set(src.commits.map((i) => i.author_name))].sort().join(",");
+    let Authors = [...new Set(src.commits.map(i => i.author_name))].sort().join(",");
     if (Authors.length === 0) {
       Authors = this.getCurrentUser();
     }
@@ -526,7 +508,7 @@ export default class MDocrRepository {
         continue;
       }
       log("Processing", this.files[i].path, "to", this.files[i].target);
-      mkdirp.sync(path.dirname(this.files[i].target));
+      fs.mkdirSync(path.dirname(this.files[i].target), { recursive: true });
       fs.writeFileSync(this.files[i].target, await this.processFile(this.files[i]));
     }
   }
@@ -546,8 +528,8 @@ export default class MDocrRepository {
         continue;
       }
       console.log("Processing", src.gitTarget, "to", src.gitPublished);
-      mkdirp.sync(path.dirname(src.published));
-      await Promise.all(this.publishers.map((f) => f(src)));
+      fs.mkdirSync(path.dirname(src.published), { recursive: true });
+      await Promise.all(this.publishers.map(f => f(src)));
     }
   }
 

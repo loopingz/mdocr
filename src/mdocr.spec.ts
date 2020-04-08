@@ -1,6 +1,5 @@
 import { suite, test } from "mocha-typescript";
 import * as assert from "assert";
-import * as mkdirp from "mkdirp";
 import * as simpleGit from "simple-git";
 import * as doAsync from "doasync";
 import { MDocsRepository, TemplateExtension } from "./mdocr";
@@ -10,37 +9,20 @@ import * as fetch from "node-fetch";
 
 class TestExtension extends TemplateExtension {
   constructor() {
-    super("testExt", ["upperblock"]);
+    super("testExt", ["upperblock"], true);
   }
 
-  parse(parser, nodes, lexer) {
-    var tok = parser.nextToken();
-
-    // parse the args and move after the block end. passing true
-    // as the second arg is required if there are no parentheses
-    var args = parser.parseSignature(null, true);
-    parser.advanceAfterBlockEnd(tok.value);
-
-    // parse the body and possibly the error block, which is optional
-    var body = parser.parseUntilBlocks("error", "endupperblock");
-
-    parser.advanceAfterBlockEnd();
-
-    // See above for notes about CallExtension
-    return new nodes.CallExtension(this, "run", args, [body]);
-  }
-
-  run(context, body) {
+  _run(context, body) {
     return body().toUpperCase();
   }
 }
 
 const ImportContent: string = `
-This is my import file
+This is my include file
 
-<Import file="./import2.md" />
+{% include "includes/include2.md" %}
 
-Imported: <CurrentVersion />
+Imported: {% currentVersion %}
 `;
 @suite
 class MDocsTest {
@@ -51,7 +33,7 @@ class MDocsTest {
     if (fs.existsSync("./test/data")) {
       rimraf.sync("./test/data");
     }
-    mkdirp.sync("./test/data");
+    fs.mkdirSync("./test/data", { recursive: true });
     this.git = doAsync(simpleGit("./test/data"));
     this.mdocr = new MDocsRepository({ rootPath: "./test/data", pdf: true });
   }
@@ -62,13 +44,13 @@ class MDocsTest {
 
   async initScenario() {
     await this.git.init();
-    mkdirp.sync("./test/data/drafts/docs");
-    mkdirp.sync("./test/data/imports");
-    fs.writeFileSync("./test/data/imports/import.md", ImportContent);
+    fs.mkdirSync("./test/data/drafts/docs", { recursive: true });
+    fs.mkdirSync("./test/data/includes", { recursive: true });
+    fs.writeFileSync("./test/data/includes/include.md", ImportContent);
     fs.writeFileSync(
-      "./test/data/imports/import2.md",
+      "./test/data/includes/include2.md",
       `
-This is my import 2 file
+This is my include 2 file
 `
     );
     fs.writeFileSync(
@@ -77,11 +59,11 @@ This is my import 2 file
 Title: Test File
 ---
 # Test Doc
-<Import file="../../imports/import.md" />
+{% include "includes/include.md" %}
 
-Version: <CurrentVersion />
+Version: {% currentVersion %}
 
-<VersionsTable />
+{% versionsTable %}
 `
     );
     fs.writeFileSync(
@@ -95,36 +77,35 @@ Versions:
     Reviewer: Thomas A. Anderson
 ---
 # Test Doc
-<Import file="../../imports/import.md" />
+{% include "includes/include.md" %}
 
-Version: <CurrentVersion />
+Version: {% currentVersion %}
 
-<VersionsTable />
+{% versionsTable %}
 `
     );
     fs.writeFileSync(
       "./test/data/drafts/docs/test3.md",
       `
 # Test Doc 3
-<Import file="../../imports/import.md" />
+{% include "includes/include.md" %}
 
-Version: <CurrentVersion />
+Version: {% currentVersion %}
 
-<VersionsTable />
 `
     );
     await this.git.add("drafts/docs/*.md");
-    await this.git.add("imports/*.md");
+    await this.git.add("includes/*.md");
     await this.git.commit("feat: first commit");
     fs.writeFileSync(
       "./test/data/drafts/docs/test.md",
       `
 # Test Doc
-<Import file="../../imports/import.md" />
+{% include "includes/include.md" %}
 
-Version: <CurrentVersion />
+Version: {% currentVersion %}
 
-<VersionsTable />
+{% versionsTable %}
 
 <Demo>
     <SubDemo>Bouzouf</SubDemo>
@@ -140,18 +121,8 @@ Version: <CurrentVersion />
   async overall() {
     await this.initScenario();
 
-    // Add a custom command
-    this.mdocr.addCommand("Demo", (cmd, ctx, mdocr) => {
-      let res = cmd.childNodes.filter(i => i.nodeName === "subdemo").length;
-      assert.equal(
-        res,
-        2,
-        "The Demo command should get one subdemo child node"
-      );
-      return `This is my custom command, you have ${res} SubDemo nodes`;
-    });
     let called = [];
-    this.mdocr.addPublisher(async file => {
+    this.mdocr.addPublisher(async (file) => {
       called.push(file);
     });
     await this.mdocr.init();
@@ -195,9 +166,7 @@ Version: <CurrentVersion />
     assert.notEqual(content.match(/Imported: 1\.2\.0/g), undefined);
     assert.notEqual(content.match(/Version: 1\.2\.0/g), undefined);
     assert.notEqual(
-      content.match(
-        /1\.0\.0\s*|\s*2019-01-01\s*|\s*Georges Abitbol\s*|\s*|\s*Thomas A. Anderson\s*/g
-      ),
+      content.match(/1\.0\.0\s*|\s*2019-01-01\s*|\s*Georges Abitbol\s*|\s*|\s*Thomas A. Anderson\s*/g),
       undefined
     );
   }
@@ -207,11 +176,7 @@ Version: <CurrentVersion />
     await this.initScenario();
     fs.writeFileSync("./test/data/drafts/docs/plop.md", "should stash");
     await this.mdocr.init();
-    assert.equal(
-      await this.mdocr.publish(),
-      false,
-      "Should not allow modified tree"
-    );
+    assert.equal(await this.mdocr.publish(), false, "Should not allow modified tree");
     fs.unlinkSync("./test/data/drafts/docs/plop.md");
   }
 
@@ -221,20 +186,16 @@ Version: <CurrentVersion />
     this.appendFile("./test/data/drafts/docs/test3.md", "should stash");
 
     await this.mdocr.init();
-    assert.equal(
-      await this.mdocr.publish(),
-      false,
-      "Should not allow modified tree"
-    );
+    assert.equal(await this.mdocr.publish(), false, "Should not allow modified tree");
   }
 
-  async ajax(url, method = "GET", format = "text", body = "") {
+  async ajax(url, method = "GET", format = "text", body = undefined) {
     let res = await fetch(`http://localhost:18181${url}`, {
       method,
       body,
       headers: {
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
     });
     if (format === "raw") {
       return res;
@@ -243,13 +204,13 @@ Version: <CurrentVersion />
   }
 
   async pause(ms: number = 1000) {
-    await new Promise(resolve => setTimeout(resolve, ms));
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   @test
   async testServerAndExtension() {
     this.mdocr.addTemplateExtension(new TestExtension());
-    this.mdocr.addTemplateFilter("myFilter", str => {
+    this.mdocr.addTemplateFilter("myFilter", (str) => {
       return (str || "").toLowerCase();
     });
     this.mdocr.addBuildContext({ myctx: "To 90 percent and More" });
@@ -268,7 +229,7 @@ Version: <CurrentVersion />
     let text = fs.readFileSync("./test/data/drafts/docs/test.md").toString();
     assert.equal(text, await this.ajax("/drafts/drafts/docs/test.md"));
     text +=
-      " {% upperblock %} this Should be uppercase {% endupperblock %}\n{{ myctx | myFilter }}\n<CurrentVersion />\n";
+      " {% upperblock %} this Should be uppercase {% endupperblock %}\n{{ myctx | myFilter }}\n{% currentVersion %}\n";
     text += " HTTP UPDATE";
     await this.ajax("/drafts/drafts/docs/test.md", "PUT", "text", text);
 
@@ -295,12 +256,7 @@ Version: <CurrentVersion />
     // Ensure PDF is not empty
     assert.notEqual(pdf, "");
 
-    await this.ajax(
-      "/commit",
-      "PUT",
-      "text",
-      JSON.stringify({ message: "feat: BREAKING i want my 80" })
-    );
+    await this.ajax("/commit", "PUT", "text", JSON.stringify({ message: "feat: BREAKING i want my 80" }));
 
     result = await this.ajax("/release", "GET");
     assert.equal(result.indexOf("+ HTTP UPDATE") >= 0, true);
