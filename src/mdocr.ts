@@ -72,7 +72,7 @@ class CurrentVersionExtension extends TemplateExtension {
     if (this.mdocr.buildForRelease() && document.commits.length > 0) {
       return document.nextVersion;
     }
-    if (document.isDirty || !document.meta.Versions) {
+    if (document.isDirty || !document.meta.Versions || document.meta.Versions.length === 0) {
       return document.nextVersion + "-SNAPSHOT";
     } else if (document.meta.Versions) {
       return document.meta.Versions[0].Id;
@@ -117,7 +117,76 @@ class VersionsTableExtension extends TemplateExtension {
   }
 }
 
-//analyse({ path: "drafts/policies/acceptable-usage-policy.md" });
+export class Document {
+  meta: any;
+  hasMeta: boolean;
+  isDirty: boolean;
+  path: string;
+  nextVersion: string;
+  currentVersion: string;
+  changes: {
+    insertions: number;
+    deletions: number;
+    changes: number;
+  };
+  target: string;
+  published: string;
+  toPublish: boolean;
+  commits: any;
+
+  constructor(filePath: string) {
+    this.path = filePath;
+  }
+
+  async init(mdocr: MDocrRepository) {
+    let absPath = mdocr.getAbsolutePath(this.path);
+    this.meta = {
+      Versions: [],
+    };
+    let content = fs.readFileSync(absPath).toString();
+    if (content.startsWith("---")) {
+      let y = content.substr(3);
+      y = y.substr(0, y.indexOf("---"));
+      this.meta = yaml.parse(y);
+      if (this.meta.Versions) {
+        this.meta.Versions.sort((a, b) => {
+          return -1 * semver.compare(a.Id, b.Id);
+        });
+        this.currentVersion = this.meta.Versions[0].Id;
+      }
+      this.hasMeta = true;
+    } else {
+      this.hasMeta = false;
+    }
+    if (!this.meta.Title) {
+      let match = content.match(/# ([^\n]*)/);
+      if (match) {
+        this.meta.Title = match[1];
+      }
+    }
+    let releaseFound = false;
+    this.commits = (await mdocr.getCommits(this.path)).filter((i) => {
+      if (i.release) {
+        releaseFound = true;
+      }
+      return !releaseFound;
+    });
+    this.isDirty = this.commits.length > 0;
+    this.nextVersion = await mdocr.getNextVersion(this);
+    let rootPath = mdocr.getRootPath();
+    let config = mdocr.getConfig();
+    this.target = path.relative(rootPath, path.normalize(this.path.replace(/.[^\/]*/, config.buildDir)));
+    this.published = path.relative(rootPath, path.normalize(this.path.replace(/.[^\/]*/, config.publishedDir)));
+    return this;
+  }
+
+  static async new(absPath: string, mdocr: MDocrRepository): Promise<Document> {
+    let file = new Document(absPath);
+    await file.init(mdocr);
+    return file;
+  }
+}
+
 /**
  * Main Class for MDocs
  */
@@ -128,9 +197,10 @@ export default class MDocrRepository {
   protected cssContent: string;
   protected publishers: any[] = [];
   protected buildContext: any = {};
-  protected targets: any = {};
-  protected gitFiles: any = {};
-  protected files: any = {};
+  // Keep 3 differents maps of Document
+  protected targets: { [key: string]: Document } = {};
+  protected gitFiles: { [key: string]: Document } = {};
+  protected files: { [key: string]: Document } = {};
   protected config: any = {};
   protected currentUser: string;
   protected releasing: boolean = false;
@@ -175,6 +245,10 @@ export default class MDocrRepository {
     this.addTemplateExtension(new VersionsTableExtension());
   }
 
+  getAbsolutePath(filePath) {
+    return path.join(this.rootPath, filePath);
+  }
+
   addPublisher(pub) {
     this.publishers.push(pub);
   }
@@ -195,78 +269,26 @@ export default class MDocrRepository {
         .map((file) => {
           return glob({ gitignore: true }).readdirSync(path.relative(".", file)).join("|");
         })
-        .join("|")
+        .join("|") // Starting in NodeJS >= 11 can use flat
         .split("|");
       let status = (await this.git.status()).files.map((i) => i.path);
       for (let i in files) {
-        this.files[files[i]] = await this.analyse(files[i]);
-
-        if (status.indexOf(this.files[files[i]].gitPath) >= 0) {
-          this.files[files[i]].isDirty = true;
+        let doc = await Document.new(path.relative(this.rootPath, files[i]), this);
+        this.files[this.getAbsolutePath(doc.path)] = doc;
+        this.targets[doc.target] = this.gitFiles[doc.path] = doc;
+        if (status.indexOf(doc.path) >= 0) {
+          doc.isDirty = true;
         }
-
-        this.targets[this.files[files[i]].gitTarget] = files[i];
-        this.gitFiles[this.files[files[i]].gitPath] = files[i];
       }
     } finally {
       process.chdir(cwd);
     }
   }
 
-  async analyse(filePath) {
-    let file: any = {
-      path: filePath,
-      absPath: path.resolve(filePath),
-    };
-    file.gitPath = path.relative(this.rootPath, filePath);
-    let foundRelease = false;
-    file.meta = {};
-    let content = fs.readFileSync(file.absPath).toString();
-    if (content.startsWith("---")) {
-      let y = content.substr(3);
-      y = y.substr(0, y.indexOf("---"));
-      file.meta = yaml.parse(y);
-      if (file.meta.Versions) {
-        file.meta.Versions.sort((a, b) => {
-          return -1 * semver.compare(a.Id, b.Id);
-        });
-        file.currentVersion = file.meta.Versions[0].Id;
-      }
-      file.hasMeta = true;
-    } else {
-      file.hasMeta = false;
-    }
-    if (!file.meta.Title) {
-      let match = content.match(/# ([^\n]*)/);
-      if (match) {
-        file.meta.Title = match[1];
-      }
-    }
-    file.commits = (await this.getCommits(file.gitPath)).filter((i) => {
-      if (i.release) {
-        foundRelease = true;
-      }
-      return !foundRelease;
-    });
-    file.isDirty = file.commits.length > 0;
-    file.nextVersion = await this.getNextVersion(file);
-    file.gitTarget = path.relative(
-      this.rootPath,
-      path.normalize(file.gitPath.replace(/.[^\/]*/, this.config.buildDir))
-    );
-    file.target = path.join(this.rootPath, file.gitTarget);
-    file.gitPublished = path.relative(
-      this.rootPath,
-      path.normalize(file.gitPath.replace(/.[^\/]*/, this.config.publishedDir))
-    );
-    file.published = path.join(this.rootPath, file.gitPublished);
-    return file;
-  }
-
-  async processFile(file) {
+  async processFile(file: Document) {
     try {
       this.buildContext.document = file;
-      return this.nunjucks.render(file.gitPath, this.buildContext);
+      return this.nunjucks.render(file.path, this.buildContext);
     } catch (err) {
       console.log(err);
       return "";
@@ -286,8 +308,11 @@ export default class MDocrRepository {
     this.buildContext = { ...this.buildContext, ...ctx };
   }
 
-  getSourceFromTarget(target) {
-    return this.files[this.targets[target]];
+  getSourceFromTarget(target): Document {
+    if (path.isAbsolute(target)) {
+      target = path.relative(this.rootPath, target);
+    }
+    return this.targets[target];
   }
 
   getCurrentUser() {
@@ -309,6 +334,10 @@ export default class MDocrRepository {
 
   buildForRelease() {
     return this.releasing;
+  }
+
+  getRootPath() {
+    return this.rootPath;
   }
 
   isIncludedInFiles(file) {
@@ -339,7 +368,7 @@ export default class MDocrRepository {
       .map((i) => i.path);
     for (let i in files) {
       let src = this.getSourceFromTarget(files[i]);
-      console.log("Updating", src.gitPath, "with", src.nextVersion);
+      console.log("Updating", src.path, "with", src.nextVersion);
       if (preview) {
         continue;
       }
@@ -348,16 +377,17 @@ export default class MDocrRepository {
       src.isDirty = false;
       src.toPublish = true;
       let y = yaml.stringify(src.meta);
+      let absPath = this.getAbsolutePath(src.path);
       if (src.hasMeta) {
         fs.writeFileSync(
-          src.absPath,
+          absPath,
           fs
-            .readFileSync(src.absPath)
+            .readFileSync(absPath)
             .toString()
             .replace(/---[\s\S]*---/, `---\n${y}---`)
         );
       } else {
-        fs.writeFileSync(src.absPath, `---\n${y}---\n` + fs.readFileSync(src.absPath).toString());
+        fs.writeFileSync(absPath, `---\n${y}---\n` + fs.readFileSync(absPath).toString());
       }
     }
     if (preview) {
@@ -375,9 +405,9 @@ export default class MDocrRepository {
     let tags = [];
     for (let i in files) {
       let src = this.getSourceFromTarget(files[i]);
-      commitsMsg.push(` - ${path.basename(src.gitPath)}@${src.nextVersion}`);
-      tags.push(path.basename(src.gitPath).replace(/\.md/, "") + "-" + src.nextVersion);
-      await this.git.add([src.gitPath, files[i]]);
+      commitsMsg.push(` - ${path.basename(src.path)}@${src.nextVersion}`);
+      tags.push(path.basename(src.path).replace(/\.md/, "") + "-" + src.nextVersion);
+      await this.git.add([src.path, files[i]]);
     }
     await this.git.commit(commitsMsg.join("\n"));
     for (let i in tags) {
@@ -387,7 +417,7 @@ export default class MDocrRepository {
     return true;
   }
 
-  async getNextVersion(file) {
+  async getNextVersion(file: Document) {
     let commits = file.commits || [];
     let versions = file.meta.Versions || [];
     let incr = Math.max(...commits.map((i) => i.incr), this.getGlobalIncrement());
@@ -406,6 +436,10 @@ export default class MDocrRepository {
       }
     }
     return nextVersion;
+  }
+
+  getConfig() {
+    return this.config;
   }
 
   async getCommits(file, from = ""): Promise<any[]> {
@@ -483,8 +517,8 @@ export default class MDocrRepository {
           syntax: ["table"],
         },
       })
-        .from(file.target)
-        .to(file.published.replace(/\.md/, ".pdf"), resolve);
+        .from(this.getAbsolutePath(file.target))
+        .to(this.getAbsolutePath(file.published).replace(/\.md/, ".pdf"), resolve);
     });
     fs.writeFileSync(file.published.replace(/\.md/, ".html"), `<style>${this.cssContent}</style>${html}`);
     return;
@@ -508,8 +542,9 @@ export default class MDocrRepository {
         continue;
       }
       log("Processing", this.files[i].path, "to", this.files[i].target);
-      fs.mkdirSync(path.dirname(this.files[i].target), { recursive: true });
-      fs.writeFileSync(this.files[i].target, await this.processFile(this.files[i]));
+      let absPath = this.getAbsolutePath(this.files[i].target);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, await this.processFile(this.files[i]));
     }
   }
 
@@ -527,7 +562,7 @@ export default class MDocrRepository {
       if (onlyPublish && !src.toPublish) {
         continue;
       }
-      console.log("Processing", src.gitTarget, "to", src.gitPublished);
+      console.log("Processing", src.target, "to", src.published);
       fs.mkdirSync(path.dirname(src.published), { recursive: true });
       await Promise.all(this.publishers.map(f => f(src)));
     }
@@ -614,32 +649,32 @@ export default class MDocrRepository {
               );
             } else {
               let match = req.url.match(/\/(\w+)\/(.*)/);
-              if (match && this.files[match[2]]) {
-                let file = this.files[match[2]];
+              if (match && this.gitFiles[match[2]]) {
+                let doc = this.gitFiles[match[2]];
                 if (match[1] === "drafts") {
                   res.writeHead(200, {
                     "Content-Type": "text/plain",
                     "Access-Control-Allow-Origin": url,
                   });
-                  res.write(fs.readFileSync(file.absPath));
+                  res.write(fs.readFileSync(this.getAbsolutePath(doc.path)));
                 } else if (match[1] === "build") {
                   res.writeHead(200, {
                     "Content-Type": "text/plain",
                     "Access-Control-Allow-Origin": url,
                   });
-                  res.write(await this.processFile(file));
+                  res.write(await this.processFile(doc));
                 } else if (match[1] === "pdf") {
                   res.writeHead(200, {
                     "Content-Type": "application/octet-stream",
                     "Access-Control-Allow-Origin": url,
                   });
-                  res.write(await this.previewer(await this.processFile(file)));
+                  res.write(await this.previewer(await this.processFile(doc)));
                 } else if (match[1] === "html") {
                   res.writeHead(200, {
                     "Content-Type": "text/html",
                     "Access-Control-Allow-Origin": url,
                   });
-                  res.write(await this.previewer(await this.processFile(file), "html"));
+                  res.write(await this.previewer(await this.processFile(doc), "html"));
                 }
               } else {
                 res.writeHead(404);
@@ -665,12 +700,41 @@ export default class MDocrRepository {
               await this.git.commit(params.message);
             } else {
               let match = req.url.match(/\/(\w+)\/(.*)/);
-              if (match && this.files[match[2]]) {
-                let file = this.files[match[2]];
-                fs.writeFileSync(file.absPath, body);
+              if (match && this.gitFiles[match[2]]) {
+                let doc = this.gitFiles[match[2]];
+                fs.writeFileSync(this.getAbsolutePath(doc.path), body);
               } else {
                 res.writeHead(404);
               }
+            }
+          } else if (req.method === "DELETE") {
+            if (req.url === "/files") {
+              let { file } = JSON.parse(body);
+              if (!fs.existsSync(file)) {
+                res.writeHead(400);
+              } else {
+                fs.unlinkSync(file);
+                await this.git.remove(file);
+              }
+            } else {
+              res.writeHead(404);
+            }
+          } else if (req.method === "POST") {
+            if (req.url === "/files") {
+              let { file, title } = JSON.parse(body);
+              if (fs.existsSync(file)) {
+                res.writeHead(409);
+              } else {
+                fs.writeFileSync(
+                  file,
+                  `---
+Title: ${title}
+---`
+                );
+                await this.git.add(file);
+              }
+            } else {
+              res.writeHead(404);
             }
           } else if (req.method === "OPTIONS") {
             // Always let throught the OPTIONS for now
