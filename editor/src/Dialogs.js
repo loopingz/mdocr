@@ -26,6 +26,7 @@ import SearchIcon from "@material-ui/icons/Search";
 import React from "react";
 import { Diff, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
+import { SinceVersion } from "./SinceVersion";
 
 const useStyles = makeStyles((theme) => ({
   appBar: {
@@ -335,15 +336,17 @@ export function WelcomeDialog(props) {
               </DialogContentText>
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <Button
-                color="primary"
-                startIcon={<AddBoxIcon />}
-                onClick={() => {
-                  setAddMode(true);
-                }}
-              >
-                New Document
-              </Button>
+              <SinceVersion current={props.mdocr.version} since="2.0.0">
+                <Button
+                  color="primary"
+                  startIcon={<AddBoxIcon />}
+                  onClick={() => {
+                    setAddMode(true);
+                  }}
+                >
+                  New Document
+                </Button>
+              </SinceVersion>
               <TextField
                 InputProps={{
                   endAdornment: (

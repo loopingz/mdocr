@@ -27,6 +27,7 @@ import {
   WelcomeDialog,
 } from "./Dialogs";
 import FileSelector from "./FileSelector";
+import { SinceVersion } from "./SinceVersion";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
 
@@ -97,6 +98,7 @@ export default function App() {
   const [previewCounter, setPreviewCounter] = React.useState(0);
   const classes = useStyles();
   const ref = useRef(null);
+
   const setRef = useCallback(
     (node) => {
       if (window.document.getElementById("preview")) {
@@ -330,9 +332,11 @@ export default function App() {
           />
           <AppBar position="fixed" color="primary" className={classes.appBar}>
             <Toolbar>
-              <IconButton color="inherit" onClick={() => setDeleteConfirmation(true)}>
-                <DeleteIcon />
-              </IconButton>
+              <SinceVersion current={mdocr.version} since="2.0.0">
+                <IconButton color="inherit" onClick={() => setDeleteConfirmation(true)} style={{ marginLeft: "-24px" }}>
+                  <DeleteIcon />
+                </IconButton>
+              </SinceVersion>
               <FileSelector
                 drafts={Object.values(mdocr.files)}
                 onChange={async (value) => {
@@ -341,9 +345,11 @@ export default function App() {
                 }}
                 value={current}
               />
-              <IconButton color="inherit" onClick={() => setAddMode(true)}>
-                <AddIcon />
-              </IconButton>
+              <SinceVersion current={mdocr.version} since="2.0.0">
+                <IconButton color="inherit" onClick={() => setAddMode(true)}>
+                  <AddIcon />
+                </IconButton>
+              </SinceVersion>
               <div className={classes.grow}>Repository: {mdocr.path}</div>
               <IconButton disabled={!mdocr.isDirty} color="inherit" onClick={() => setCommitMode(true)}>
                 <CommitIcon />
