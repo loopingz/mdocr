@@ -242,7 +242,12 @@ export function IntroDialog(props) {
               minHeight: "calc(100% - 260px)",
             }}
           >
-            <DialogContentText>MDocr Editor Version: {props.uiVersion}</DialogContentText>
+            <DialogContentText>
+              MDocr Editor Version:{" "}
+              <a href={`https://github.com/loopingz/mdocr/tree/${props.uiVersion}`} target="_blank">
+                {props.uiVersion.substr(0, 7)}
+              </a>
+            </DialogContentText>
             <DialogContentText>
               You can use MDocr to manage your Markdown documents in a Git repository.
             </DialogContentText>
