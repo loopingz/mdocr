@@ -26,6 +26,7 @@ import SearchIcon from "@material-ui/icons/Search";
 import React from "react";
 import { Diff, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
+import * as semver from "semver";
 import { SinceVersion } from "./SinceVersion";
 
 const useStyles = makeStyles((theme) => ({
@@ -314,6 +315,24 @@ export function WelcomeDialog(props) {
     },
   ];
   const rows = Object.keys(props.mdocr.files).map((p) => ({ ...props.mdocr.files[p], code: p }));
+  var alert;
+  if (semver.lt(props.mdocr.version, props.mdocr.latest)) {
+    alert = (
+      <div
+        style={{
+          color: "black",
+          backgroundColor: "#ffc107",
+          position: "fixed",
+          left: 0,
+          bottom: 0,
+          width: "100%",
+          padding: 20,
+        }}
+      >
+        Your local version ({props.mdocr.version}) of mdocr is not up to date with latest ({props.mdocr.latest})
+      </div>
+    );
+  }
   return (
     <div fullScreen={true} open={true} aria-labelledby="responsive-dialog-title">
       <div style={{ position: "fixed", width: "100%", backgroundColor: "white", zIndex: 3 }}>
@@ -331,6 +350,7 @@ export function WelcomeDialog(props) {
                 <br />
                 Current repository: {props.mdocr.repository}
                 <br />
+                {alert}
                 <br />
                 Please select a file
               </DialogContentText>

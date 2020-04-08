@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-import * as fs from "fs";
-import * as markdownpdf from "markdown-pdf";
-import * as parse5 from "parse5";
-import * as semver from "semver";
-import * as glob from "glob-fs";
-import * as path from "path";
-import * as simpleGit from "simple-git";
-import * as util from "util";
-import * as doAsync from "doasync";
-import * as yaml from "yaml";
-import * as mkdirp from "mkdirp";
 import * as dateFormat from "dateformat";
-import * as process from "process";
+import * as doAsync from "doasync";
+import * as fs from "fs";
+import * as glob from "glob-fs";
+import * as markdownpdf from "markdown-pdf";
+import * as mkdirp from "mkdirp";
+import * as fetch from "node-fetch";
 import * as nunjucks from "nunjucks";
 import * as open from "open";
+import * as parse5 from "parse5";
+import * as path from "path";
+import * as process from "process";
+import * as semver from "semver";
+import * as simpleGit from "simple-git";
+import * as yaml from "yaml";
 
 async function Import(cmd, ctx, mdocr) {
   let file = path.dirname(ctx.absPath) + "/" + cmd.arguments.file;
@@ -45,23 +45,21 @@ async function VersionsTable(cmd, ctx, mdocr) {
     versions.unshift({
       Id: ctx.nextVersion,
       Date: dateFormat(Date.now(), "yyyy-mm-dd"),
-      Authors: [...new Set(ctx.commits.map(i => i.author_name))]
-        .sort()
-        .join(","), // Creating a unique set of authors
-      Reviewer: mdocr.getCurrentUser()
+      Authors: [...new Set(ctx.commits.map((i) => i.author_name))].sort().join(","), // Creating a unique set of authors
+      Reviewer: mdocr.getCurrentUser(),
     });
   } else if (ctx.isDirty) {
-    let authors = new Set(ctx.commits.map(i => i.author_name));
+    let authors = new Set(ctx.commits.map((i) => i.author_name));
     authors.add(mdocr.getCurrentUser());
     versions.unshift({
       Id: ctx.nextVersion + "-SNAPSHOT",
       Date: "-",
       Authors: [...authors].sort().join(","), // Creating a unique set of authors
-      Reviewer: "N/A"
+      Reviewer: "N/A",
     });
   }
 
-  versions.forEach(version => {
+  versions.forEach((version) => {
     res += `| ${version.Id}     | ${version.Date} | ${version.Authors} | ${version.Reviewer} |\n`;
   });
   return res;
@@ -99,7 +97,7 @@ export default class MDocrRepository {
   protected commands: any = {
     Import,
     CurrentVersion,
-    VersionsTable
+    VersionsTable,
   };
   protected targets: any = {};
   protected gitFiles: any = {};
@@ -109,37 +107,31 @@ export default class MDocrRepository {
   protected releasing: boolean = false;
   protected increment: number = 0;
   protected nunjucks: any;
+  npmRegistry: any;
   /**
    *
    * @param rootPath Path to the git repository of documents
    */
   constructor(config: any = {}) {
-    this.rootPath = path.resolve(
-      path.normalize(config.rootPath || process.cwd())
-    );
+    this.rootPath = path.resolve(path.normalize(config.rootPath || process.cwd()));
     // Initiate our Git client
     this.git = doAsync(simpleGit(this.rootPath));
     // Read package.json from the repository
     let packageInfo: any = {};
     if (fs.existsSync(this.rootPath + "/package.json")) {
-      packageInfo = JSON.parse(
-        fs.readFileSync(this.rootPath + "/package.json").toString()
-      );
+      packageInfo = JSON.parse(fs.readFileSync(this.rootPath + "/package.json").toString());
     }
     packageInfo.mdocr = packageInfo.mdocr || {};
     this.config = { ...packageInfo.mdocr, ...config };
-    this.config.files = this.config.files ||
-      packageInfo.files || ["./drafts/**/*.md"];
-    this.config.files = this.config.files.map(f => {
+    this.config.files = this.config.files || packageInfo.files || ["./drafts/**/*.md"];
+    this.config.files = this.config.files.map((f) => {
       if (!f.startsWith("/")) {
         return path.join(this.rootPath, f);
       }
       return f;
     });
     this.config.buildDir = path.normalize(this.config.buildDir || "build/");
-    this.config.publishedDir = path.normalize(
-      path.join(this.rootPath, this.config.publishedDir || "published/")
-    );
+    this.config.publishedDir = path.normalize(path.join(this.rootPath, this.config.publishedDir || "published/"));
     if (this.config.pdf) {
       this.publishers.push(this.pdf.bind(this));
     }
@@ -162,11 +154,7 @@ export default class MDocrRepository {
 
   async init(message: string = undefined) {
     if (!this.currentUser) {
-      this.currentUser = (await this.git.raw([
-        "config",
-        "--get",
-        "user.name"
-      ])).trim();
+      this.currentUser = (await this.git.raw(["config", "--get", "user.name"])).trim();
     }
     if (message) {
       this.increment = this.getVersionIncrement(message);
@@ -177,14 +165,12 @@ export default class MDocrRepository {
     process.chdir(this.rootPath);
     try {
       let files = this.config.files
-        .map(file => {
-          return glob({ gitignore: true })
-            .readdirSync(path.relative(".", file))
-            .join("|");
+        .map((file) => {
+          return glob({ gitignore: true }).readdirSync(path.relative(".", file)).join("|");
         })
         .join("|")
         .split("|");
-      let status = (await this.git.status()).files.map(i => i.path);
+      let status = (await this.git.status()).files.map((i) => i.path);
       for (let i in files) {
         this.files[files[i]] = await this.analyse(files[i]);
 
@@ -203,7 +189,7 @@ export default class MDocrRepository {
   async analyse(filePath) {
     let file: any = {
       path: filePath,
-      absPath: path.resolve(filePath)
+      absPath: path.resolve(filePath),
     };
     file.gitPath = path.relative(this.rootPath, filePath);
     let foundRelease = false;
@@ -229,7 +215,7 @@ export default class MDocrRepository {
         file.meta.Title = match[1];
       }
     }
-    file.commits = (await this.getCommits(file.gitPath)).filter(i => {
+    file.commits = (await this.getCommits(file.gitPath)).filter((i) => {
       if (i.release) {
         foundRelease = true;
       }
@@ -283,8 +269,7 @@ export default class MDocrRepository {
         command = `<${fullTag}></${tagName}>`;
         str = str.substr(fullTag.length + 2); // Skiping the tag
       } else {
-        command =
-          "<" + str.substr(0, str.indexOf(`</${tagName}>`)) + `</${tagName}>`;
+        command = "<" + str.substr(0, str.indexOf(`</${tagName}>`)) + `</${tagName}>`;
         str = str.substr(command.length);
       }
       if (this.commands[tagName]) {
@@ -292,7 +277,7 @@ export default class MDocrRepository {
         if (cmd.childNodes.length) {
           cmd = cmd.childNodes[0];
           cmd.arguments = {};
-          cmd.attrs.forEach(a => (cmd.arguments[a.name] = a.value));
+          cmd.attrs.forEach((a) => (cmd.arguments[a.name] = a.value));
           result += (await this.commands[tagName](cmd, file, this)) || "";
         }
       }
@@ -328,9 +313,7 @@ export default class MDocrRepository {
   }
 
   async getDocumentVersion(src) {
-    let Authors = [...new Set(src.commits.map(i => i.author_name))]
-      .sort()
-      .join(",");
+    let Authors = [...new Set(src.commits.map((i) => i.author_name))].sort().join(",");
     if (Authors.length === 0) {
       Authors = this.getCurrentUser();
     }
@@ -338,7 +321,7 @@ export default class MDocrRepository {
       Id: src.nextVersion,
       Date: dateFormat(Date.now(), "yyyy-mm-dd"),
       Authors,
-      Reviewer: this.getCurrentUser()
+      Reviewer: this.getCurrentUser(),
     };
   }
 
@@ -352,7 +335,7 @@ export default class MDocrRepository {
 
   async isDirty() {
     let status = await this.git.status();
-    if (status.files.filter(i => this.isIncludedInFiles(i.path)).length > 0) {
+    if (status.files.filter((i) => this.isIncludedInFiles(i.path)).length > 0) {
       return true;
     }
     return false;
@@ -360,9 +343,7 @@ export default class MDocrRepository {
 
   async publish(preview = false, file: string = undefined) {
     if (await this.isDirty()) {
-      console.log(
-        "You need to work from a clean repository, stash your changes"
-      );
+      console.log("You need to work from a clean repository, stash your changes");
       return false;
     }
     this.releasing = true;
@@ -370,10 +351,10 @@ export default class MDocrRepository {
     this.releasing = false;
     let status = await this.git.status();
     let files = status.files
-      .filter(f => {
+      .filter((f) => {
         return f.path.startsWith(this.config.buildDir);
       })
-      .map(i => i.path);
+      .map((i) => i.path);
     for (let i in files) {
       let src = this.getSourceFromTarget(files[i]);
       console.log("Updating", src.gitPath, "with", src.nextVersion);
@@ -394,10 +375,7 @@ export default class MDocrRepository {
             .replace(/---[\s\S]*---/, `---\n${y}---`)
         );
       } else {
-        fs.writeFileSync(
-          src.absPath,
-          `---\n${y}---\n` + fs.readFileSync(src.absPath).toString()
-        );
+        fs.writeFileSync(src.absPath, `---\n${y}---\n` + fs.readFileSync(src.absPath).toString());
       }
     }
     if (preview) {
@@ -407,18 +385,16 @@ export default class MDocrRepository {
     await this.build((...args) => {}, file);
     // Add all files and commit
     status.files
-      .filter(f => {
+      .filter((f) => {
         return f.path.startsWith(this.config.buildDir);
       })
-      .map(i => i.path);
+      .map((i) => i.path);
     let commitsMsg = ["release:", ""];
     let tags = [];
     for (let i in files) {
       let src = this.getSourceFromTarget(files[i]);
       commitsMsg.push(` - ${path.basename(src.gitPath)}@${src.nextVersion}`);
-      tags.push(
-        path.basename(src.gitPath).replace(/\.md/, "") + "-" + src.nextVersion
-      );
+      tags.push(path.basename(src.gitPath).replace(/\.md/, "") + "-" + src.nextVersion);
       await this.git.add([src.gitPath, files[i]]);
     }
     await this.git.commit(commitsMsg.join("\n"));
@@ -432,7 +408,7 @@ export default class MDocrRepository {
   async getNextVersion(file) {
     let commits = file.commits || [];
     let versions = file.meta.Versions || [];
-    let incr = Math.max(...commits.map(i => i.incr), this.getGlobalIncrement());
+    let incr = Math.max(...commits.map((i) => i.incr), this.getGlobalIncrement());
     let nextVersion = "1.0.0";
     if (versions.length) {
       nextVersion = versions[0].Id;
@@ -451,10 +427,12 @@ export default class MDocrRepository {
   }
 
   async getCommits(file, from = ""): Promise<any[]> {
-    let commits = (await this.git.log({
-      file,
-      from
-    })).all.map(c => {
+    let commits = (
+      await this.git.log({
+        file,
+        from,
+      })
+    ).all.map((c) => {
       c.incr = this.getVersionIncrement(c.message);
       c.release = c.message.startsWith("release:");
       return c;
@@ -466,11 +444,7 @@ export default class MDocrRepository {
     let incr = 1;
     if (message.indexOf("BREAKING") >= 0) {
       incr = 100;
-    } else if (
-      message.startsWith("feat:") ||
-      message.startsWith("feature:") ||
-      message.startsWith("feat(")
-    ) {
+    } else if (message.startsWith("feat:") || message.startsWith("feature:") || message.startsWith("feat(")) {
       incr = 10;
     }
     if (message.startsWith("release:")) {
@@ -482,10 +456,10 @@ export default class MDocrRepository {
   async previewer(str, type: string = "pdf") {
     const through = require("through");
     let html;
-    let pdf = await new Promise(resolve => {
+    let pdf = await new Promise((resolve) => {
       markdownpdf({
         preProcessHtml: () => {
-          return through(function(data) {
+          return through(function (data) {
             html = data.toString();
             this.queue(data);
           });
@@ -494,8 +468,8 @@ export default class MDocrRepository {
         remarkable: {
           preset: "commonmark",
           plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
-          syntax: ["table"]
-        }
+          syntax: ["table"],
+        },
       })
         .from.string(str)
         .to.buffer({}, (err, data) => {
@@ -512,10 +486,10 @@ export default class MDocrRepository {
     const through = require("through");
     let html;
 
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       markdownpdf({
         preProcessHtml: () => {
-          return through(function(data) {
+          return through(function (data) {
             html = data.toString();
             this.queue(data);
           });
@@ -524,16 +498,13 @@ export default class MDocrRepository {
         remarkable: {
           preset: "commonmark",
           plugins: [require("remarkable-plantuml"), require("remarkable-meta")],
-          syntax: ["table"]
-        }
+          syntax: ["table"],
+        },
       })
         .from(file.target)
         .to(file.published.replace(/\.md/, ".pdf"), resolve);
     });
-    fs.writeFileSync(
-      file.published.replace(/\.md/, ".html"),
-      `<style>${this.cssContent}</style>${html}`
-    );
+    fs.writeFileSync(file.published.replace(/\.md/, ".html"), `<style>${this.cssContent}</style>${html}`);
     return;
   }
 
@@ -544,26 +515,19 @@ export default class MDocrRepository {
   async build(log = console.log, file: string = undefined) {
     // Get all files -> a bit dirty
     let summary = await this.git.diffSummary();
-    summary.files.forEach(f => {
+    summary.files.forEach((f) => {
       if (this.files[f.file]) {
         let { insertions, deletions, changes } = f;
         this.files[f.file].changes = { insertions, deletions, changes };
       }
     });
     for (let i in this.files) {
-      if (
-        file &&
-        this.files[i].path !== file &&
-        this.files[i].target !== file
-      ) {
+      if (file && this.files[i].path !== file && this.files[i].target !== file) {
         continue;
       }
       log("Processing", this.files[i].path, "to", this.files[i].target);
       mkdirp.sync(path.dirname(this.files[i].target));
-      fs.writeFileSync(
-        this.files[i].target,
-        await this.processFile(this.files[i])
-      );
+      fs.writeFileSync(this.files[i].target, await this.processFile(this.files[i]));
     }
   }
 
@@ -583,19 +547,28 @@ export default class MDocrRepository {
       }
       console.log("Processing", src.gitTarget, "to", src.gitPublished);
       mkdirp.sync(path.dirname(src.published));
-      await Promise.all(this.publishers.map(f => f(src)));
+      await Promise.all(this.publishers.map((f) => f(src)));
     }
+  }
+
+  async getLatest() {
+    if (this.npmRegistry) {
+      return this.npmRegistry;
+    }
+    let res = await fetch("https://registry.npmjs.org/mdocr");
+    this.npmRegistry = (await res.json())["dist-tags"].latest;
+    return this.npmRegistry;
   }
 
   async edit(url = "https://mdocr.loopingz.com") {
     let packageInfo = require("../package.json");
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const http = require("http");
       http
         .createServer(async (req, res) => {
           let body = "";
-          await new Promise(resolve => {
-            req.on("data", chunk => {
+          await new Promise((resolve) => {
+            req.on("data", (chunk) => {
               body += chunk.toString(); // convert Buffer to string
             });
             req.on("end", () => {
@@ -605,7 +578,7 @@ export default class MDocrRepository {
           // TODO Add referer checks
           res.writeHead(200, {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": url
+            "Access-Control-Allow-Origin": url,
           });
           if (req.method === "GET") {
             if (req.url.startsWith("/release")) {
@@ -619,7 +592,7 @@ export default class MDocrRepository {
               }
               res.writeHead(200, {
                 "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": url
+                "Access-Control-Allow-Origin": url,
               });
               await this.init();
               this.releasing = true;
@@ -636,7 +609,7 @@ export default class MDocrRepository {
               }
               res.writeHead(200, {
                 "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": url
+                "Access-Control-Allow-Origin": url,
               });
               await this.init(msg);
               await this.build((...args) => {});
@@ -651,9 +624,10 @@ export default class MDocrRepository {
                 JSON.stringify({
                   files: this.files,
                   version: packageInfo.version,
+                  latest: await this.getLatest(),
                   path: this.rootPath,
                   isDirty: await this.isDirty(),
-                  repository: await this.getRemoteRepository()
+                  repository: await this.getRemoteRepository(),
                 })
               );
             } else {
@@ -663,29 +637,27 @@ export default class MDocrRepository {
                 if (match[1] === "drafts") {
                   res.writeHead(200, {
                     "Content-Type": "text/plain",
-                    "Access-Control-Allow-Origin": url
+                    "Access-Control-Allow-Origin": url,
                   });
                   res.write(fs.readFileSync(file.absPath));
                 } else if (match[1] === "build") {
                   res.writeHead(200, {
                     "Content-Type": "text/plain",
-                    "Access-Control-Allow-Origin": url
+                    "Access-Control-Allow-Origin": url,
                   });
                   res.write(await this.processFile(file));
                 } else if (match[1] === "pdf") {
                   res.writeHead(200, {
                     "Content-Type": "application/octet-stream",
-                    "Access-Control-Allow-Origin": url
+                    "Access-Control-Allow-Origin": url,
                   });
                   res.write(await this.previewer(await this.processFile(file)));
                 } else if (match[1] === "html") {
                   res.writeHead(200, {
                     "Content-Type": "text/html",
-                    "Access-Control-Allow-Origin": url
+                    "Access-Control-Allow-Origin": url,
                   });
-                  res.write(
-                    await this.previewer(await this.processFile(file), "html")
-                  );
+                  res.write(await this.previewer(await this.processFile(file), "html"));
                 }
               } else {
                 res.writeHead(404);
@@ -723,7 +695,7 @@ export default class MDocrRepository {
             res.writeHead(200, {
               "Content-Type": "text/plain",
               "Access-Control-Allow-Origin": url,
-              "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE"
+              "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE",
             });
           } else {
             res.writeHead(404);
@@ -744,42 +716,41 @@ export default class MDocrRepository {
     require("yargs")
       .command({
         command: "build [file]",
-        builder: yargs => yargs.string("message"),
+        builder: (yargs) => yargs.string("message"),
         desc: "Build all markdowns or specific file running all commands",
-        handler: async argv => {
+        handler: async (argv) => {
           await drepo.init(argv.message);
           await drepo.build(console.log, argv.file);
-        }
+        },
       })
       .command({
         command: "publish [file]",
-        builder: yargs => yargs.boolean("pretend"),
-        desc:
-          "Generate new versions for all updated documents or selected file ",
-        handler: async argv => {
+        builder: (yargs) => yargs.boolean("pretend"),
+        desc: "Generate new versions for all updated documents or selected file ",
+        handler: async (argv) => {
           await drepo.init();
           await drepo.publish(argv.pretend, argv.file);
-        }
+        },
       })
       .command({
         command: "postpublish [file]",
         desc: "Execute post processors on all documents or selected file ",
-        handler: async argv => {
+        handler: async (argv) => {
           await drepo.init();
           await drepo.build((...args) => {}, argv.file);
           await drepo.postpublish(argv.file);
-        }
+        },
       })
       .command({
         command: "edit",
-        builder: yargs => yargs.string("url"),
+        builder: (yargs) => yargs.string("url"),
         desc: "Launch the editor",
-        handler: async argv => {
+        handler: async (argv) => {
           argv.url = argv.url || "https://mdocr.loopingz.com";
           await drepo.init();
           open(argv.url);
           await drepo.edit(argv.url);
-        }
+        },
       })
       .demandCommand()
       .help()
