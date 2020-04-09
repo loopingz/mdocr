@@ -180,8 +180,8 @@ export class Document {
     return this;
   }
 
-  static async new(absPath: string, mdocr: MDocrRepository): Promise<Document> {
-    let file = new Document(absPath);
+  static async new(path: string, mdocr: MDocrRepository): Promise<Document> {
+    let file = new Document(path);
     await file.init(mdocr);
     return file;
   }
@@ -710,11 +710,25 @@ export default class MDocrRepository {
           } else if (req.method === "DELETE") {
             if (req.url === "/files") {
               let { file } = JSON.parse(body);
-              if (!fs.existsSync(file)) {
-                res.writeHead(400);
+              let doc = this.gitFiles[file];
+              if (doc) {
+                let toRemove = ["path", "target", "published"];
+                for (let i in toRemove) {
+                  let abs = this.getAbsolutePath(doc[toRemove[i]]);
+                  if (fs.existsSync(abs)) {
+                    await this.git.rm(doc[toRemove[i]]);
+                  }
+                }
+                this.gitFiles[doc.path] = undefined;
+                this.targets[doc.target] = undefined;
+                this.files[this.getAbsolutePath(doc.path)] = undefined;
+                res.writeHead(200, {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": url,
+                });
+                res.write("{}");
               } else {
-                fs.unlinkSync(file);
-                await this.git.remove(file);
+                res.writeHead(400);
               }
             } else {
               res.writeHead(404);
@@ -722,16 +736,22 @@ export default class MDocrRepository {
           } else if (req.method === "POST") {
             if (req.url === "/files") {
               let { file, title } = JSON.parse(body);
-              if (fs.existsSync(file)) {
+              let absPath = this.getAbsolutePath(file);
+              if (fs.existsSync(absPath)) {
                 res.writeHead(409);
               } else {
                 fs.writeFileSync(
-                  file,
+                  absPath,
                   `---
 Title: ${title}
 ---`
                 );
                 await this.git.add(file);
+                console.log("Add a new Document", file);
+                let doc = await Document.new(file, this);
+                this.gitFiles[doc.path] = this.targets[doc.target] = this.files[absPath] = doc;
+                res.write("{}");
+                console.log("Done Document");
               }
             } else {
               res.writeHead(404);

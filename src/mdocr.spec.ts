@@ -285,6 +285,24 @@ Version: {% currentVersion %}
     assert.equal(res.status, 404);
     res = await this.ajax("/plop404", "OPTIONS", "raw");
     assert.equal(res.status, 200);
+
+    // Create a new content
+    result = await this.ajax("/files", "DELETE", "json", JSON.stringify({ file: "drafts/docs/test.md" }));
+    assert.equal(fs.existsSync("./test/data/drafts/docs/test.md"), false);
+    assert.equal(fs.existsSync("./test/data/build/docs/test.md"), false);
+    assert.equal(fs.existsSync("./test/data/published/docs/test.md"), false);
+
+    result = await this.ajax(
+      "/files",
+      "POST",
+      "json",
+      JSON.stringify({ file: "drafts/docs/newfile.md", title: "MyTest" })
+    );
+    assert.equal(fs.existsSync("./test/data/drafts/docs/newfile.md"), true);
+    assert.equal(
+      fs.readFileSync("./test/data/drafts/docs/newfile.md").toString().indexOf("---\nTitle: MyTest\n---") >= 0,
+      true
+    );
     // Stop the server
     await fetch("http://localhost:18181/stop");
   }
