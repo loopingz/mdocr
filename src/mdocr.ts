@@ -12,6 +12,7 @@ import * as process from "process";
 import * as nunjucks from "nunjucks";
 import * as open from "open";
 import * as fetch from "node-fetch";
+import * as Router from "router";
 
 export abstract class TemplateExtension {
   private __name: string;
@@ -577,196 +578,231 @@ export default class MDocrRepository {
     return this.npmRegistry;
   }
 
+  async removeFile(path) {
+    let doc = this.gitFiles[path];
+    if (!doc) {
+      return;
+    }
+    let toRemove = ["path", "target", "published"];
+    for (let i in toRemove) {
+      let abs = this.getAbsolutePath(doc[toRemove[i]]);
+      if (fs.existsSync(abs)) {
+        await this.git.rm(doc[toRemove[i]]);
+      }
+    }
+    this.gitFiles[doc.path] = undefined;
+    this.targets[doc.target] = undefined;
+    this.files[this.getAbsolutePath(doc.path)] = undefined;
+  }
+
   async edit(url = "https://mdocr.loopingz.com") {
     let packageInfo = require("../package.json");
     return new Promise((resolve) => {
       const http = require("http");
-      http
-        .createServer(async (req, res) => {
-          let body = "";
-          await new Promise((resolve) => {
-            req.on("data", (chunk) => {
-              body += chunk.toString(); // convert Buffer to string
-            });
-            req.on("end", () => {
-              resolve();
-            });
-          });
-          // TODO Add referer checks
+      const router = Router({ mergeParams: true });
+
+      // Default git operations
+      router
+        .route("/release")
+        .get(async (req, res) => {
+          let commits = (await this.git.log()).all;
+          let hash = "";
+          for (let i in commits) {
+            hash = commits[i].hash;
+            if (commits[i].message.startsWith("release:")) {
+              break;
+            }
+          }
+
           res.writeHead(200, {
-            "Content-Type": "application/json",
+            "Content-Type": "text/plain",
             "Access-Control-Allow-Origin": url,
           });
-          if (req.method === "GET") {
-            if (req.url.startsWith("/release")) {
-              let commits = (await this.git.log()).all;
-              let hash = "";
-              for (let i in commits) {
-                hash = commits[i].hash;
-                if (commits[i].message.startsWith("release:")) {
-                  break;
-                }
-              }
-              res.writeHead(200, {
-                "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": url,
-              });
-              await this.init();
-              this.releasing = true;
-              await this.build((...args) => {});
-              this.releasing = false;
-              res.write(await this.git.diff([hash]));
-            } else if (req.url.startsWith("/changes")) {
-              let match = req.url.match(/\/changes\?.*incr=(\d+)/) || ["", ""];
-              let msg = "fix:";
-              if (match[1] == 100) {
-                msg = "BREAKING";
-              } else if (match[1] == 10) {
-                msg = "feat:";
-              }
-              res.writeHead(200, {
-                "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": url,
-              });
-              await this.init(msg);
-              await this.build((...args) => {});
-              res.write(await this.git.diff());
-            } else if (req.url === "/stop") {
-              res.write(JSON.stringify({ message: "Bye!" }));
-              res.end();
-              resolve();
-            } else if (req.url === "/mdocr") {
-              await this.init();
-              res.write(
-                JSON.stringify({
-                  files: this.files,
-                  version: packageInfo.version,
-                  latest: await this.getLatest(),
-                  path: this.rootPath,
-                  isDirty: await this.isDirty(),
-                  repository: await this.getRemoteRepository(),
-                })
-              );
-            } else {
-              let match = req.url.match(/\/(\w+)\/(.*)/);
-              if (match && this.gitFiles[match[2]]) {
-                let doc = this.gitFiles[match[2]];
-                if (match[1] === "drafts") {
-                  res.writeHead(200, {
-                    "Content-Type": "text/plain",
-                    "Access-Control-Allow-Origin": url,
-                  });
-                  res.write(fs.readFileSync(this.getAbsolutePath(doc.path)));
-                } else if (match[1] === "build") {
-                  res.writeHead(200, {
-                    "Content-Type": "text/plain",
-                    "Access-Control-Allow-Origin": url,
-                  });
-                  res.write(await this.processFile(doc));
-                } else if (match[1] === "pdf") {
-                  res.writeHead(200, {
-                    "Content-Type": "application/octet-stream",
-                    "Access-Control-Allow-Origin": url,
-                  });
-                  res.write(await this.previewer(await this.processFile(doc)));
-                } else if (match[1] === "html") {
-                  res.writeHead(200, {
-                    "Content-Type": "text/html",
-                    "Access-Control-Allow-Origin": url,
-                  });
-                  res.write(await this.previewer(await this.processFile(doc), "html"));
-                }
-              } else {
-                res.writeHead(404);
-              }
-            }
-          } else if (req.method === "PUT") {
-            if (req.url === "/release") {
-              await this.init();
-              await this.publish();
-            } else if (req.url === "/commit") {
-              /**
-              {
-                message: ""
-              }
-               */
-              let params: any = JSON.parse(body);
-              await this.init(params.message);
-              await this.build((...args) => {});
-              let status = await this.git.diffSummary();
-              for (let i in status.files) {
-                await this.git.add(status.files[i].file);
-              }
-              await this.git.commit(params.message);
-            } else {
-              let match = req.url.match(/\/(\w+)\/(.*)/);
-              if (match && this.gitFiles[match[2]]) {
-                let doc = this.gitFiles[match[2]];
-                fs.writeFileSync(this.getAbsolutePath(doc.path), body);
-              } else {
-                res.writeHead(404);
-              }
-            }
-          } else if (req.method === "DELETE") {
-            if (req.url === "/files") {
-              let { file } = JSON.parse(body);
-              let doc = this.gitFiles[file];
-              if (doc) {
-                let toRemove = ["path", "target", "published"];
-                for (let i in toRemove) {
-                  let abs = this.getAbsolutePath(doc[toRemove[i]]);
-                  if (fs.existsSync(abs)) {
-                    await this.git.rm(doc[toRemove[i]]);
-                  }
-                }
-                this.gitFiles[doc.path] = undefined;
-                this.targets[doc.target] = undefined;
-                this.files[this.getAbsolutePath(doc.path)] = undefined;
-                res.writeHead(200, {
-                  "Content-Type": "application/json",
-                  "Access-Control-Allow-Origin": url,
-                });
-                res.write("{}");
-              } else {
-                res.writeHead(400);
-              }
-            } else {
-              res.writeHead(404);
-            }
-          } else if (req.method === "POST") {
-            if (req.url === "/files") {
-              let { file, title } = JSON.parse(body);
-              let absPath = this.getAbsolutePath(file);
-              if (fs.existsSync(absPath)) {
-                res.writeHead(409);
-              } else {
-                fs.writeFileSync(
-                  absPath,
-                  `---
-Title: ${title}
----`
-                );
-                await this.git.add(file);
-                console.log("Add a new Document", file);
-                let doc = await Document.new(file, this);
-                this.gitFiles[doc.path] = this.targets[doc.target] = this.files[absPath] = doc;
-                res.write("{}");
-                console.log("Done Document");
-              }
-            } else {
-              res.writeHead(404);
-            }
-          } else if (req.method === "OPTIONS") {
-            // Always let throught the OPTIONS for now
+          await this.init();
+          this.releasing = true;
+          await this.build((...args) => {});
+          this.releasing = false;
+          res.write(await this.git.diff([hash]));
+          res.end();
+        })
+        .put(async (req, res) => {
+          await this.init();
+          await this.publish();
+          res.end();
+        });
+      router.put("/commit", async (req, res) => {
+        const { body } = req.params;
+        let params: any = JSON.parse(await body);
+        await this.init(params.message);
+        await this.build((...args) => {});
+        let status = await this.git.diffSummary();
+        for (let i in status.files) {
+          await this.git.add(status.files[i].file);
+        }
+        await this.git.commit(params.message);
+        res.end();
+      });
+      router.get("/changes", async (req, res) => {
+        let match = req.url.match(/\/changes\?.*incr=(\d+)/) || ["", ""];
+        let msg = "fix:";
+        if (match[1] == 100) {
+          msg = "BREAKING";
+        } else if (match[1] == 10) {
+          msg = "feat:";
+        }
+        res.writeHead(200, {
+          "Content-Type": "text/plain",
+          "Access-Control-Allow-Origin": url,
+        });
+        await this.init(msg);
+        await this.build((...args) => {});
+        res.write(await this.git.diff());
+        res.end();
+      });
+
+      // MDocr information
+      router.get("/stop", async (req, res) => {
+        res.write(JSON.stringify({ message: "Bye!" }));
+        res.end();
+        resolve();
+      });
+      router.get("/mdocr", async (req, res) => {
+        await this.init();
+        res.write(
+          JSON.stringify({
+            files: this.files,
+            version: packageInfo.version,
+            latest: await this.getLatest(),
+            path: this.rootPath,
+            isDirty: await this.isDirty(),
+            repository: await this.getRemoteRepository(),
+          })
+        );
+        res.end();
+      });
+
+      // Files operation
+      router
+        .route("/:type/*")
+        .get(async (req, res) => {
+          const { type, "0": path } = req.params;
+          let doc = this.gitFiles[path];
+          if (!doc) {
+            res.writeHead(404);
+            res.end();
+            return;
+          }
+          if (type === "drafts") {
             res.writeHead(200, {
               "Content-Type": "text/plain",
               "Access-Control-Allow-Origin": url,
-              "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE",
             });
+            res.write(fs.readFileSync(this.getAbsolutePath(doc.path)));
+          } else if (type === "build") {
+            res.writeHead(200, {
+              "Content-Type": "text/plain",
+              "Access-Control-Allow-Origin": url,
+            });
+            res.write(await this.processFile(doc));
+          } else if (type === "pdf") {
+            res.writeHead(200, {
+              "Content-Type": "application/octet-stream",
+              "Access-Control-Allow-Origin": url,
+            });
+            res.write(await this.previewer(await this.processFile(doc)));
+          } else if (type === "html") {
+            res.writeHead(200, {
+              "Content-Type": "text/html",
+              "Access-Control-Allow-Origin": url,
+            });
+            res.write(await this.previewer(await this.processFile(doc), "html"));
           } else {
             res.writeHead(404);
           }
           res.end();
+        })
+        .put(async (req, res) => {
+          const { "0": path, body } = req.params;
+          if (this.gitFiles[path]) {
+            let doc = this.gitFiles[path];
+            fs.writeFileSync(this.getAbsolutePath(doc.path), await body);
+          } else {
+            res.writeHead(404);
+          }
+          res.end();
+        })
+        .delete(async (req, res) => {
+          const { "0": path, type } = req.params;
+          if (type !== "drafts") {
+            res.writeHead(400);
+            res.end();
+            return;
+          }
+          if (this.gitFiles[path]) {
+            await this.removeFile(path);
+            res.writeHead(204);
+          } else {
+            res.writeHead(404);
+          }
+          res.end();
+        })
+        .post(async (req, res) => {
+          const { "0": file, type, body } = req.params;
+          let { title } = JSON.parse(await body);
+          let absPath = this.getAbsolutePath(file);
+          if (type !== "drafts") {
+            res.writeHead(400);
+            res.end();
+            return;
+          }
+          if (fs.existsSync(absPath)) {
+            res.writeHead(409);
+          } else {
+            fs.writeFileSync(
+              absPath,
+              `---
+Title: ${title}
+---`
+            );
+            await this.git.add(file);
+            let doc = await Document.new(file, this);
+            this.gitFiles[doc.path] = this.targets[doc.target] = this.files[absPath] = doc;
+            res.write("{}");
+          }
+          res.end();
+        });
+
+      // Main server
+      http
+        .createServer(async (req, res) => {
+          res.writeHead(200, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": url,
+          });
+          setTimeout(() => res.end(), 60000);
+          let reqBody = "";
+          req.params = {
+            body: new Promise((resolve) => {
+              req.on("data", (chunk) => {
+                reqBody += chunk.toString(); // convert Buffer to string
+              });
+              req.on("end", () => {
+                resolve(reqBody);
+              });
+            }),
+          };
+          router(req, res, () => {
+            if (req.method === "OPTIONS") {
+              res.writeHead(200, {
+                "Content-Type": "text/plain",
+                "Access-Control-Allow-Origin": req.url,
+                "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE",
+              });
+            } else {
+              res.writeHead(404);
+            }
+            res.end();
+          });
         })
         .listen(18181);
     });

@@ -197,6 +197,9 @@ Version: {% currentVersion %}
         "Content-Type": "application/json",
       },
     });
+    if (res.status === 204) {
+      return undefined;
+    }
     if (format === "raw") {
       return res;
     }
@@ -283,21 +286,28 @@ Version: {% currentVersion %}
     assert.equal(res.status, 404);
     res = await this.ajax("/plop404", "GET", "raw");
     assert.equal(res.status, 404);
+    res = await this.ajax("/drafts/plop404", "GET", "raw");
+    assert.equal(res.status, 404);
+    res = await this.ajax("/drafts/plop404", "DELETE", "raw");
+    assert.equal(res.status, 404);
+    res = await this.ajax("/plop/plop404", "DELETE", "raw");
+    assert.equal(res.status, 400);
+    res = await this.ajax("/plop/plop404", "POST", "raw", JSON.stringify({}));
+    assert.equal(res.status, 400);
+    res = await this.ajax("/build/drafts/docs/test.md", "POST", "raw", "{}");
+    assert.equal(res.status, 400);
+    res = await this.ajax("/drafts/drafts/docs/test.md", "POST", "raw", "{}");
+    assert.equal(res.status, 409);
     res = await this.ajax("/plop404", "OPTIONS", "raw");
     assert.equal(res.status, 200);
 
     // Create a new content
-    result = await this.ajax("/files", "DELETE", "json", JSON.stringify({ file: "drafts/docs/test.md" }));
+    result = await this.ajax("/drafts/drafts/docs/test.md", "DELETE");
     assert.equal(fs.existsSync("./test/data/drafts/docs/test.md"), false);
     assert.equal(fs.existsSync("./test/data/build/docs/test.md"), false);
     assert.equal(fs.existsSync("./test/data/published/docs/test.md"), false);
 
-    result = await this.ajax(
-      "/files",
-      "POST",
-      "json",
-      JSON.stringify({ file: "drafts/docs/newfile.md", title: "MyTest" })
-    );
+    result = await this.ajax("/drafts/drafts/docs/newfile.md", "POST", "json", JSON.stringify({ title: "MyTest" }));
     assert.equal(fs.existsSync("./test/data/drafts/docs/newfile.md"), true);
     assert.equal(
       fs.readFileSync("./test/data/drafts/docs/newfile.md").toString().indexOf("---\nTitle: MyTest\n---") >= 0,
