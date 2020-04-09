@@ -2,17 +2,17 @@
 import * as dateFormat from "dateformat";
 import * as doAsync from "doasync";
 import * as fs from "fs";
-import * as markdownpdf from "markdown-pdf";
-import * as semver from "semver";
 import * as glob from "glob-fs";
-import * as path from "path";
-import * as simpleGit from "simple-git";
-import * as yaml from "yaml";
-import * as process from "process";
+import * as markdownpdf from "markdown-pdf";
+import * as fetch from "node-fetch";
 import * as nunjucks from "nunjucks";
 import * as open from "open";
-import * as fetch from "node-fetch";
+import * as path from "path";
+import * as process from "process";
 import * as Router from "router";
+import * as semver from "semver";
+import * as simpleGit from "simple-git";
+import * as yaml from "yaml";
 
 export abstract class TemplateExtension {
   private __name: string;
@@ -321,7 +321,7 @@ export default class MDocrRepository {
   }
 
   async getDocumentVersion(src) {
-    let Authors = [...new Set(src.commits.map(i => i.author_name))].sort().join(",");
+    let Authors = [...new Set(src.commits.map((i) => i.author_name))].sort().join(",");
     if (Authors.length === 0) {
       Authors = this.getCurrentUser();
     }
@@ -565,7 +565,7 @@ export default class MDocrRepository {
       }
       console.log("Processing", src.target, "to", src.published);
       fs.mkdirSync(path.dirname(src.published), { recursive: true });
-      await Promise.all(this.publishers.map(f => f(src)));
+      await Promise.all(this.publishers.map((f) => f(src)));
     }
   }
 
@@ -601,6 +601,20 @@ export default class MDocrRepository {
       const http = require("http");
       const router = Router({ mergeParams: true });
 
+      const sendMdocrStatus = async (res) => {
+        res.write(
+          JSON.stringify({
+            files: this.files,
+            version: packageInfo.version,
+            latest: await this.getLatest(),
+            path: this.rootPath,
+            isDirty: await this.isDirty(),
+            repository: await this.getRemoteRepository(),
+          })
+        );
+        res.end();
+      };
+
       // Default git operations
       router
         .route("/release")
@@ -616,7 +630,6 @@ export default class MDocrRepository {
 
           res.writeHead(200, {
             "Content-Type": "text/plain",
-            "Access-Control-Allow-Origin": url,
           });
           await this.init();
           this.releasing = true;
@@ -652,7 +665,6 @@ export default class MDocrRepository {
         }
         res.writeHead(200, {
           "Content-Type": "text/plain",
-          "Access-Control-Allow-Origin": url,
         });
         await this.init(msg);
         await this.build((...args) => {});
@@ -668,17 +680,7 @@ export default class MDocrRepository {
       });
       router.get("/mdocr", async (req, res) => {
         await this.init();
-        res.write(
-          JSON.stringify({
-            files: this.files,
-            version: packageInfo.version,
-            latest: await this.getLatest(),
-            path: this.rootPath,
-            isDirty: await this.isDirty(),
-            repository: await this.getRemoteRepository(),
-          })
-        );
-        res.end();
+        await sendMdocrStatus(res);
       });
 
       // Files operation
@@ -695,25 +697,21 @@ export default class MDocrRepository {
           if (type === "drafts") {
             res.writeHead(200, {
               "Content-Type": "text/plain",
-              "Access-Control-Allow-Origin": url,
             });
             res.write(fs.readFileSync(this.getAbsolutePath(doc.path)));
           } else if (type === "build") {
             res.writeHead(200, {
               "Content-Type": "text/plain",
-              "Access-Control-Allow-Origin": url,
             });
             res.write(await this.processFile(doc));
           } else if (type === "pdf") {
             res.writeHead(200, {
               "Content-Type": "application/octet-stream",
-              "Access-Control-Allow-Origin": url,
             });
             res.write(await this.previewer(await this.processFile(doc)));
           } else if (type === "html") {
             res.writeHead(200, {
               "Content-Type": "text/html",
-              "Access-Control-Allow-Origin": url,
             });
             res.write(await this.previewer(await this.processFile(doc), "html"));
           } else {
@@ -740,7 +738,7 @@ export default class MDocrRepository {
           }
           if (this.gitFiles[path]) {
             await this.removeFile(path);
-            res.writeHead(204);
+            await sendMdocrStatus(res);
           } else {
             res.writeHead(404);
           }
@@ -757,28 +755,38 @@ export default class MDocrRepository {
           }
           if (fs.existsSync(absPath)) {
             res.writeHead(409);
+            res.end();
           } else {
             fs.writeFileSync(
               absPath,
               `---
 Title: ${title}
----`
+---
+
+# ${title}
+`
             );
             await this.git.add(file);
             let doc = await Document.new(file, this);
             this.gitFiles[doc.path] = this.targets[doc.target] = this.files[absPath] = doc;
-            res.write("{}");
+            await sendMdocrStatus(res);
           }
-          res.end();
         });
 
       // Main server
       http
         .createServer(async (req, res) => {
-          res.writeHead(200, {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": url,
-          });
+          if (req.method === "OPTIONS") {
+            res.writeHead(200, {
+              "Content-Type": "text/plain",
+              "Access-Control-Allow-Origin": url,
+              "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE",
+            });
+            res.end();
+            return;
+          }
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Access-Control-Allow-Origin", url);
           setTimeout(() => res.end(), 60000);
           let reqBody = "";
           req.params = {
@@ -792,15 +800,7 @@ Title: ${title}
             }),
           };
           router(req, res, () => {
-            if (req.method === "OPTIONS") {
-              res.writeHead(200, {
-                "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": req.url,
-                "Access-Control-Allow-Methods": "GET,PUT,OPTIONS,POST,DELETE",
-              });
-            } else {
-              res.writeHead(404);
-            }
+            res.writeHead(404);
             res.end();
           });
         })

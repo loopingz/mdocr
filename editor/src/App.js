@@ -79,6 +79,7 @@ let previewInterval;
 export default function App() {
   // Autosuggest will call this function every time you need to update suggestions.
   // You already implemented this logic above, so just use it.
+  const defaultSize = parseInt(localStorage.getItem("splitPos") || window.innerWidth / 2, 10);
   const [mdocr, setMdocr] = React.useState();
   const url = "http://localhost:18181";
   const [value, setValue] = React.useState("");
@@ -87,7 +88,7 @@ export default function App() {
   const [current, setCurrent] = React.useState(null);
   const [preview, setPreview] = React.useState(null);
   const [numPages, setNumPages] = React.useState(0);
-  const [previewEnable, setPreviewEnable] = React.useState(false);
+  const [previewEnable, setPreviewEnable] = React.useState(true);
   const [previewContent, setPreviewContent] = React.useState(null);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [commitMode, setCommitMode] = React.useState(false);
@@ -96,6 +97,7 @@ export default function App() {
   const [deleteConfirmation, setDeleteConfirmation] = React.useState(false);
   const [previewScrollTop, setPreviewScrollTop] = React.useState(0);
   const [previewCounter, setPreviewCounter] = React.useState(0);
+  const [splitPos, setSplitPos] = React.useState(defaultSize);
   const classes = useStyles();
   const ref = useRef(null);
 
@@ -144,8 +146,27 @@ export default function App() {
     }
     setPreviewLoading(false);
   };
+
   let previewElement = <SearchIcon style={{ width: "128px", height: "128px", color: "#999" }} />;
   let addComponent = false;
+  const addHandler = async (filename, title) => {
+    setAddMode(false);
+    if (filename && title) {
+      let res = await fetch(`${url}/drafts/${filename}`, {
+        method: "POST",
+        body: JSON.stringify({ title }),
+      });
+      let md = await res.json();
+      setMdocr(md);
+      let j;
+      for (j in md.files) {
+        if (md.files[j].path === filename) {
+          setCurrent(md.files[j]);
+        }
+      }
+    }
+  };
+
   if (previewLoading) {
     addComponent = true;
     previewElement = <CircularProgress className={classes.progress} />;
@@ -230,7 +251,7 @@ export default function App() {
       } else {
         body = meta + val;
       }
-      await fetch(`${url}/drafts/${current.gitPath}`, {
+      await fetch(`${url}/drafts/${current.path}`, {
         method: "PUT",
         body,
       });
@@ -256,7 +277,7 @@ export default function App() {
     if (!file) {
       return;
     }
-    let res = await fetch(`${url}/drafts/${file.gitPath}`);
+    let res = await fetch(`${url}/drafts/${file.path}`);
     let md = await res.text();
     if (md.startsWith("---")) {
       let curMeta = md.substr(0, md.substr(3).indexOf("---") + 7);
@@ -274,6 +295,7 @@ export default function App() {
       <WelcomeDialog
         uiVersion={commit}
         mdocr={mdocr}
+        onAdd={addHandler}
         onChange={async (value) => {
           setCurrent(value);
           refreshCurrent(value);
@@ -303,19 +325,25 @@ export default function App() {
   if (displayMeta) {
     val = meta + value;
   }
-  const previewEnableButton = previewEnable ? <FormatIndentDecreaseIcon /> : <FormatIndentIncreaseIcon />;
-  const defaultSize = previewEnable
-    ? window.innerWidth
-    : parseInt(localStorage.getItem("splitPos") || window.innerWidth / 2, 10);
+  const overlaysPos = previewEnable ? splitPos : window.innerWidth;
+  const previewEnableButton = previewEnable ? <FormatIndentIncreaseIcon /> : <FormatIndentDecreaseIcon />;
   return (
     <div>
       <IconButton
         onClick={() => setPreviewEnable(!previewEnable)}
-        style={{ zIndex: 2, position: "fixed", left: defaultSize - 40 }}
+        style={{ zIndex: 2, position: "fixed", left: overlaysPos - 40 }}
       >
         {previewEnableButton}
       </IconButton>
-      <SplitPane split="vertical" defaultSize={defaultSize} onChange={(size) => localStorage.setItem("splitPos", size)}>
+      <SplitPane
+        split="vertical"
+        defaultSize={defaultSize}
+        size={previewEnable ? splitPos : window.innerWidth}
+        onChange={(size) => {
+          localStorage.setItem("splitPos", size);
+          setSplitPos(size);
+        }}
+      >
         <div>
           <ReactMde
             value={val}
@@ -332,6 +360,20 @@ export default function App() {
           />
           <AppBar position="fixed" color="primary" className={classes.appBar}>
             <Toolbar>
+              <div
+                title="Welcome Panel"
+                onClick={() => {
+                  setCurrent(undefined);
+                }}
+                style={{
+                  cursor: "pointer",
+                  position: "fixed",
+                  bottom: "60px",
+                  left: overlaysPos - (previewEnable ? 32 : 80),
+                }}
+              >
+                <img src="mdocR.svg" alt="MdocR Logo" style={{ width: "64px" }} />
+              </div>
               <SinceVersion current={mdocr.version} since="2.0.0">
                 <IconButton color="inherit" onClick={() => setDeleteConfirmation(true)} style={{ marginLeft: "-24px" }}>
                   <DeleteIcon />
@@ -392,12 +434,13 @@ export default function App() {
               />
             </div>
             <div>
-              <IconButton color="inherit">
-                <RefreshIcon
-                  onClick={() => {
-                    getPreviewContent(preview);
-                  }}
-                />
+              <IconButton
+                color="inherit"
+                onClick={() => {
+                  getPreviewContent(preview);
+                }}
+              >
+                <RefreshIcon />
               </IconButton>
             </div>
           </div>
@@ -432,16 +475,17 @@ export default function App() {
         }}
       />
 
-      <AddDialog
-        mdocr={mdocr}
-        handleClose={(filename, title) => {
-          setAddMode(false);
-        }}
-        open={addMode}
-      />
+      <AddDialog mdocr={mdocr} handleClose={addHandler} open={addMode} />
       <DeleteConfirmationDialog
-        handleClose={(validation) => {
+        handleClose={async (validation) => {
           setDeleteConfirmation(false);
+          if (validation) {
+            let res = await fetch(`${url}/drafts/${current.path}`, {
+              method: "DELETE",
+            });
+            setMdocr({ ...(await res.json()) });
+            setCurrent(undefined);
+          }
         }}
         file={current.path}
         open={deleteConfirmation}

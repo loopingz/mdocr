@@ -163,7 +163,7 @@ SingleValue.propTypes = {
   /**
    * Props passed to the wrapping element for the group.
    */
-  innerProps: PropTypes.any.isRequired,
+  innerProps: PropTypes.any,
   selectProps: PropTypes.object.isRequired,
 };
 
@@ -295,7 +295,6 @@ export default function FileSelector(props) {
           value={props.value}
           onChange={(value, action) => {
             if (props.onChange) {
-              console.log("Value:", value);
               props.onChange(value);
             }
           }}

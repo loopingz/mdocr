@@ -4,7 +4,6 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import Dialog from "@material-ui/core/Dialog";
 import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
-import DialogContentText from "@material-ui/core/DialogContentText";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import IconButton from "@material-ui/core/IconButton";
 import InputAdornment from "@material-ui/core/InputAdornment";
@@ -181,7 +180,7 @@ export function DiffDialog(props) {
 
 export function PublishDialog(props) {
   return (
-    <Dialog fullScreen {...props} TransitionComponent={Transition}>
+    <Dialog fullscreen {...props} TransitionComponent={Transition}>
       {props.open ? (
         <DiffDialog
           label="Publish new versions"
@@ -199,7 +198,7 @@ export function PublishDialog(props) {
 
 export function CommitDialog(props) {
   return (
-    <Dialog fullScreen {...props} TransitionComponent={Transition}>
+    <Dialog fullscreen {...props} TransitionComponent={Transition}>
       {props.open ? (
         <DiffDialog label="Commit changes" actionLabel="commit" diffUrl="/changes" commit {...props} />
       ) : null}
@@ -219,7 +218,7 @@ async function checkMdocr(url, callback) {
 export function IntroDialog(props) {
   checkMdocr(props.url, props.onMdocr);
   return (
-    <div fullScreen={true} open={true} aria-labelledby="responsive-dialog-title">
+    <div aria-labelledby="responsive-dialog-title">
       <div
         style={{
           display: "flex",
@@ -242,16 +241,14 @@ export function IntroDialog(props) {
               minHeight: "calc(100% - 260px)",
             }}
           >
-            <DialogContentText>
+            <div className="dlgContent">
               MDocr Editor Version:{" "}
               <a href={`https://github.com/loopingz/mdocr/tree/${props.uiVersion}`} target="_blank">
                 {props.uiVersion.substr(0, 7)}
               </a>
-            </DialogContentText>
-            <DialogContentText>
-              You can use MDocr to manage your Markdown documents in a Git repository.
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">You can use MDocr to manage your Markdown documents in a Git repository.</div>
+            <div className="dlgContent">
               <h3>Install requirements</h3>
               <ul>
                 <li>NodeJS</li>
@@ -263,32 +260,32 @@ export function IntroDialog(props) {
                   <pre>yarn global add mdocr</pre>
                 </li>
               </ul>
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">
               <h3>Initiate a repository</h3>
               <pre>git init</pre>
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">
               <h3>Launch in your repository</h3>
               <pre>mdocr edit</pre>
-            </DialogContentText>
+            </div>
           </div>
           <div style={{ padding: "10px", width: "50%" }}>
-            <DialogContentText>
+            <div className="dlgContent">
               MDocR use conventional commits to generate the version of the document. It also give you the ability to
               pull datas from your own systems to automate some contents
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">
               <h3>Conventional commits</h3>
               What is conventional commits?
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">
               <h3>Integrations</h3>
-            </DialogContentText>
-            <DialogContentText>
+            </div>
+            <div className="dlgContent">
               <h3>Publish</h3>
               Once the documents are ready to publish, you can publish and activate the post publish actions
-            </DialogContentText>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -339,7 +336,7 @@ export function WelcomeDialog(props) {
     );
   }
   return (
-    <div fullScreen={true} open={true} aria-labelledby="responsive-dialog-title">
+    <div aria-labelledby="responsive-dialog-title">
       <div style={{ position: "fixed", width: "100%", backgroundColor: "white", zIndex: 3 }}>
         <div style={{ display: "flex", justifyContent: "center", paddingTop: "30px" }}>
           <img src="mdocR.svg" alt="MdocR Logo" style={{ width: "200px" }} />
@@ -350,7 +347,7 @@ export function WelcomeDialog(props) {
         <DialogContent>
           <div style={{ display: "flex", flexDirection: "row" }}>
             <div style={{ flexGrow: 1 }}>
-              <DialogContentText>
+              <div className="dlgContent">
                 Current path: {props.mdocr.path}
                 <br />
                 Current repository: {props.mdocr.repository}
@@ -358,7 +355,7 @@ export function WelcomeDialog(props) {
                 {alert}
                 <br />
                 Please select a file
-              </DialogContentText>
+              </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               <SinceVersion current={props.mdocr.version} since="2.0.0">
@@ -424,12 +421,15 @@ export function WelcomeDialog(props) {
                         );
                       })}
                       <TableCell key="action">
-                        <IconButton aria-label="edit" size="small" className={classes.margin}>
-                          <EditIcon
-                            onClick={() => {
-                              props.onChange({ ...row, value: row.path, label: row.path });
-                            }}
-                          />
+                        <IconButton
+                          aria-label="edit"
+                          size="small"
+                          onClick={() => {
+                            props.onChange({ ...row, value: row.path, label: row.path });
+                          }}
+                          className={classes.margin}
+                        >
+                          <EditIcon />
                         </IconButton>
                       </TableCell>
                     </TableRow>
@@ -439,7 +439,7 @@ export function WelcomeDialog(props) {
           </Table>
         </TableContainer>
       </DialogContent>
-      <AddDialog handleClose={() => setAddMode(false)} open={addMode} />
+      <AddDialog handleClose={props.onAdd} open={addMode} />
     </div>
   );
 }
@@ -453,9 +453,9 @@ export function AddDialog(props) {
         Add a new document
       </DialogTitle>
       <DialogContent>
-        <DialogContentText>
+        <div className="dlgContent">
           The document will be added to your repository, filename should include the path.
-        </DialogContentText>
+        </div>
         <div>
           <TextField
             required
@@ -509,12 +509,12 @@ export function DeleteConfirmationDialog(props) {
     >
       <DialogTitle id="alert-dialog-slide-title">{"Delete confirmation?"}</DialogTitle>
       <DialogContent>
-        <DialogContentText id="alert-dialog-slide-description">
+        <div className="dlgContent" id="alert-dialog-slide-description">
           Are you sure you want to delete this document, its built and published versions?
           <br />
           <br />
           {props.file}
-        </DialogContentText>
+        </div>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => props.handleClose(false)}>Cancel</Button>
