@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.0.1](https://github.com/loopingz/mdocr/compare/v2.0.0...v2.0.1) (2020-04-10)
+
+
+### Bug Fixes
+
+* travis compilation to avoid empty package ([7c9d535](https://github.com/loopingz/mdocr/commit/7c9d535dc414f580e8d6f0ab86b2170ff6ee9c93))
+
 ## [2.0.0](https://github.com/loopingz/mdocr/compare/v1.1.2...v2.0.0) (2020-04-10)
 
 
