@@ -174,10 +174,9 @@ export class Document {
     });
     this.isDirty = this.commits.length > 0;
     this.nextVersion = await mdocr.getNextVersion(this);
-    let rootPath = mdocr.getRootPath();
     let config = mdocr.getConfig();
-    this.target = path.relative(rootPath, path.normalize(this.path.replace(/.[^\/]*/, config.buildDir)));
-    this.published = path.relative(rootPath, path.normalize(this.path.replace(/.[^\/]*/, config.publishedDir)));
+    this.target = path.normalize(this.path.replace(/.[^\/]*/, config.buildDir));
+    this.published = path.normalize(this.path.replace(/.[^\/]*/, config.publishedDir));
     return this;
   }
 
@@ -231,7 +230,7 @@ export default class MDocrRepository {
       return f;
     });
     this.config.buildDir = path.normalize(this.config.buildDir || "build/");
-    this.config.publishedDir = path.normalize(path.join(this.rootPath, this.config.publishedDir || "published/"));
+    this.config.publishedDir = path.normalize(this.config.publishedDir || "published/");
     if (this.config.pdf) {
       this.publishers.push(this.pdf.bind(this));
     }
@@ -289,7 +288,11 @@ export default class MDocrRepository {
   async processFile(file: Document) {
     try {
       this.buildContext.document = file;
-      return this.nunjucks.render(file.path, this.buildContext);
+      let res = this.nunjucks.render(file.path, this.buildContext);
+      if (!this.config.includeMeta && res.startsWith("---\n")) {
+        res = res.replace(/---\n[\w\W]*\n---\n/g, "");
+      }
+      return res;
     } catch (err) {
       console.log(err);
       return "";
@@ -412,7 +415,7 @@ export default class MDocrRepository {
     }
     await this.git.commit(commitsMsg.join("\n"));
     for (let i in tags) {
-      await this.git.addTag(tags[i]);
+      await this.git.addAnnotatedTag(tags[i], tags[i]);
     }
     await this.postpublish(true);
     return true;
@@ -502,7 +505,6 @@ export default class MDocrRepository {
   async pdf(file) {
     const through = require("through");
     let html;
-
     await new Promise((resolve) => {
       markdownpdf({
         preProcessHtml: () => {
@@ -521,7 +523,10 @@ export default class MDocrRepository {
         .from(this.getAbsolutePath(file.target))
         .to(this.getAbsolutePath(file.published).replace(/\.md/, ".pdf"), resolve);
     });
-    fs.writeFileSync(file.published.replace(/\.md/, ".html"), `<style>${this.cssContent}</style>${html}`);
+    fs.writeFileSync(
+      this.getAbsolutePath(file.published.replace(/\.md/, ".html")),
+      `<style>${this.cssContent}</style>${html}`
+    );
     return;
   }
 
