@@ -138,7 +138,7 @@ export default function App() {
     }
     setPreviewCounter(previewCounter + 1);
     setPreviewLoading(true);
-    let res = await fetch(`${url}/${prev.value}/${current.gitPath}`);
+    let res = await fetch(`${url}/${prev.value}/${current.path}`);
     if (prev.value === "pdf") {
       setPreviewContent(await res.arrayBuffer());
     } else {
