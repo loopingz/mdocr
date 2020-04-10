@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.0](https://github.com/loopingz/mdocr/compare/v1.1.2...v2.0.0) (2020-04-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* drop the Command to only use Nunjucks extension
+
+### Features
+
+* add conditional display on mdocr version ([aab749a](https://github.com/loopingz/mdocr/commit/aab749ae0a23c765f9f3ddc9fdb81c20006e024d))
+* add display warning if local version is not up to date ([f258cf5](https://github.com/loopingz/mdocr/commit/f258cf558d20bb9489e8139405c77571f4ad55a0))
+* add new/delete file options ([7b2f187](https://github.com/loopingz/mdocr/commit/7b2f187181d23ed812fe50c14393f0b47a208874))
+* drop the Command to only use Nunjucks extension ([825512c](https://github.com/loopingz/mdocr/commit/825512cebbdaf1f2b50e6071fefd5ee0d75954b3))
+* UI Improvementsr ([7014e1e](https://github.com/loopingz/mdocr/commit/7014e1e6e874ecd4b28b5c8fd7598b22851de872)), closes [#2](https://github.com/loopingz/mdocr/issues/2)
+
+
+### Bug Fixes
+
+* add a link to github ([f238e93](https://github.com/loopingz/mdocr/commit/f238e933591a1a5cc437fb3289868fa027f6012e))
+* CORS security and finish feature add/delete file ([ea6dfd8](https://github.com/loopingz/mdocr/commit/ea6dfd896f7dcaa5b07d479e8c74318e7cdb26d6))
+* update editor title ([16c3d98](https://github.com/loopingz/mdocr/commit/16c3d9858d0e703d36340a0f53112cc25fa4892a))
+* update favicon.ico ([87df003](https://github.com/loopingz/mdocr/commit/87df00359c2f2f752feb5b182e3e4be95fb135ed))
+* use relative for publishDir ([8c1d411](https://github.com/loopingz/mdocr/commit/8c1d411adb04d2f310a94c277aae41a07b54649a))
+
 ### [1.1.2](https://github.com/loopingz/mdocr/compare/v1.1.1...v1.1.2) (2019-10-07)
 
 
