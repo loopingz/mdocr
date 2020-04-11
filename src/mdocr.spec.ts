@@ -82,6 +82,10 @@ Versions:
 Version: {% currentVersion %}
 
 {% versionsTable %}
+
+| Col1 | Col 2 |
+| ----- | ------ |
+| Test1 | Test2 |
 `
     );
     fs.writeFileSync(
@@ -153,7 +157,6 @@ Version: {% currentVersion %}
     await this.mdocr.publish();
 
     assert.equal(called.length, 3, "Should publish 3 documents");
-
     assert.equal(called[0].nextVersion, "1.0.1");
     assert.equal(called[1].nextVersion, "1.2.0");
     assert.equal(called[2].nextVersion, "2.0.0");
@@ -169,6 +172,9 @@ Version: {% currentVersion %}
       content.match(/1\.0\.0\s*|\s*2019-01-01\s*|\s*Georges Abitbol\s*|\s*|\s*Thomas A. Anderson\s*/g),
       undefined
     );
+
+    content = fs.readFileSync("./test/data/drafts/docs/test2.md").toString();
+    assert.equal(content.indexOf("versionsTable") > 0, true);
   }
 
   @test

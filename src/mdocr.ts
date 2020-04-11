@@ -145,9 +145,9 @@ export class Document {
       Versions: [],
     };
     let content = fs.readFileSync(absPath).toString();
-    if (content.startsWith("---")) {
+    if (content.startsWith("---\n")) {
       let y = content.substr(3);
-      y = y.substr(0, y.indexOf("---"));
+      y = y.substr(0, y.indexOf("---\n"));
       this.meta = yaml.parse(y);
       if (this.meta.Versions) {
         this.meta.Versions.sort((a, b) => {
@@ -388,7 +388,7 @@ export default class MDocrRepository {
           fs
             .readFileSync(absPath)
             .toString()
-            .replace(/---[\s\S]*---/, `---\n${y}---`)
+            .replace(/^---\n[\s\S]*---\n/, `---\n${y}---\n`)
         );
       } else {
         fs.writeFileSync(absPath, `---\n${y}---\n` + fs.readFileSync(absPath).toString());
