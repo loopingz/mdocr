@@ -149,6 +149,10 @@ export class Document {
       let y = content.substr(3);
       y = y.substr(0, y.indexOf("---\n"));
       this.meta = yaml.parse(y);
+      if (!this.meta) {
+        console.log("Cannot load meta of Markdown", absPath);
+        this.meta = {};
+      }
       if (this.meta.Versions) {
         this.meta.Versions.sort((a, b) => {
           return -1 * semver.compare(a.Id, b.Id);
