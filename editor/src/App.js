@@ -9,7 +9,9 @@ import FormatIndentDecreaseIcon from "@material-ui/icons/FormatIndentDecrease";
 import FormatIndentIncreaseIcon from "@material-ui/icons/FormatIndentIncrease";
 import PublishIcon from "@material-ui/icons/Publish";
 import RefreshIcon from "@material-ui/icons/Refresh";
+import SaveIcon from "@material-ui/icons/Save";
 import SearchIcon from "@material-ui/icons/Search";
+import * as download from "downloadjs";
 import CommitIcon from "mdi-material-ui/SourceCommitLocal";
 import React, { useCallback, useRef } from "react";
 import ReactMde, { commands } from "react-mde";
@@ -18,14 +20,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import Select from "react-select";
 import SplitPane from "react-split-pane";
 import "./App.css";
-import {
-  AddDialog,
-  CommitDialog,
-  DeleteConfirmationDialog,
-  IntroDialog,
-  PublishDialog,
-  WelcomeDialog,
-} from "./Dialogs";
+import { AddDialog, CommitDialog, DeleteConfirmationDialog, IntroDialog, PublishDialog, WelcomeDialog } from "./Dialogs";
 import FileSelector from "./FileSelector";
 import { SinceVersion } from "./SinceVersion";
 
@@ -439,8 +434,28 @@ export default function App() {
                 onClick={() => {
                   getPreviewContent(preview);
                 }}
+                disabled={!preview || preview.value === "none"}
               >
                 <RefreshIcon />
+              </IconButton>
+              <IconButton
+                color="inherit"
+                onClick={async () => {
+                  let prev = preview.value;
+                  let res = await fetch(`${url}/${prev}/${current.path}`);
+                  let content = await res.blob();
+                  let file = current.path.split("/").pop();
+                  if (prev === "pdf") {
+                    download(content, `${file}.pdf`, "application/octect-stream");
+                  } else if (prev === "html") {
+                    download(content, `${file}.html`, "text/html");
+                  } else if (prev === "build") {
+                    download(content, `${file}.md`, "text/plain");
+                  }
+                }}
+                disabled={!preview || preview.value === "none"}
+              >
+                <SaveIcon />
               </IconButton>
             </div>
           </div>
