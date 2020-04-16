@@ -244,7 +244,7 @@ export default class MDocrRepository {
       this.cssPath = path.join(__dirname, "..", "mdocr.css");
     }
     this.cssContent = fs.readFileSync(this.cssPath).toString();
-    this.nunjucks = nunjucks.configure(this.rootPath, { autoescape: true });
+    this.nunjucks = nunjucks.configure(this.rootPath, { autoescape: true, noCache: true });
     this.addTemplateExtension(new CurrentVersionExtension());
     this.addTemplateExtension(new VersionsTableExtension());
   }
