@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.0.3](https://github.com/loopingz/mdocr/compare/v2.0.2...v2.0.3) (2020-04-16)
+
+
+### Bug Fixes
+
+* invalid meta in document crash ([f36bcf3](https://github.com/loopingz/mdocr/commit/f36bcf3c95bad07db0c15da0055ce1f601d66864))
+* prevent nunjucks from caching ([846233f](https://github.com/loopingz/mdocr/commit/846233fda4cea03cb161727eb5260c33a74b4fc9))
+
 ### [2.0.2](https://github.com/loopingz/mdocr/compare/v2.0.1...v2.0.2) (2020-04-11)
 
 
