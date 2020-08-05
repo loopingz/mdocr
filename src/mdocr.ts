@@ -184,8 +184,8 @@ export class Document {
     return this;
   }
 
-  static async new(path: string, mdocr: MDocrRepository): Promise<Document> {
-    let file = new Document(path);
+  static async new(docPath: string, mdocr: MDocrRepository): Promise<Document> {
+    let file = new Document(docPath);
     await file.init(mdocr);
     return file;
   }
@@ -587,8 +587,8 @@ export default class MDocrRepository {
     return this.npmRegistry;
   }
 
-  async removeFile(path) {
-    let doc = this.gitFiles[path];
+  async removeFile(docPath) {
+    let doc = this.gitFiles[docPath];
     if (!doc) {
       return;
     }
@@ -696,8 +696,8 @@ export default class MDocrRepository {
       router
         .route("/:type/*")
         .get(async (req, res) => {
-          const { type, "0": path } = req.params;
-          let doc = this.gitFiles[path];
+          const { type, "0": docPath } = req.params;
+          let doc = this.gitFiles[docPath];
           if (!doc) {
             res.writeHead(404);
             res.end();
@@ -729,9 +729,9 @@ export default class MDocrRepository {
           res.end();
         })
         .put(async (req, res) => {
-          const { "0": path, body } = req.params;
-          if (this.gitFiles[path]) {
-            let doc = this.gitFiles[path];
+          const { "0": docPath, body } = req.params;
+          if (this.gitFiles[docPath]) {
+            let doc = this.gitFiles[docPath];
             fs.writeFileSync(this.getAbsolutePath(doc.path), await body);
           } else {
             res.writeHead(404);
@@ -739,14 +739,14 @@ export default class MDocrRepository {
           res.end();
         })
         .delete(async (req, res) => {
-          const { "0": path, type } = req.params;
+          const { "0": docPath, type } = req.params;
           if (type !== "drafts") {
             res.writeHead(400);
             res.end();
             return;
           }
-          if (this.gitFiles[path]) {
-            await this.removeFile(path);
+          if (this.gitFiles[docPath]) {
+            await this.removeFile(docPath);
             await sendMdocrStatus(res);
           } else {
             res.writeHead(404);
@@ -799,12 +799,12 @@ Title: ${title}
           setTimeout(() => res.end(), 60000);
           let reqBody = "";
           req.params = {
-            body: new Promise((resolve) => {
+            body: new Promise((localResolve) => {
               req.on("data", (chunk) => {
                 reqBody += chunk.toString(); // convert Buffer to string
               });
               req.on("end", () => {
-                resolve(reqBody);
+                localResolve(reqBody);
               });
             }),
           };
