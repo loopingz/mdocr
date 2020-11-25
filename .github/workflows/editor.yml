@@ -21,11 +21,12 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-      - name: Build project
+      - name: Build editor and publish
         run: |
           cd editor/ && yarn && cd ..
           sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
           CI=false yarn editor-publish
+
 
 
 
