@@ -21,10 +21,3 @@ jobs:
           tags: true
         api_key:
           secure: aDbgJbUgN9nAes9LY346HcOOsECibEZm7n1aNwH4ubpbi1yIFB2Q0LtNoEQwC1oP1WcbmYpwsNbL32CvH9DAVxKttjWSE0ULjlacg/Gmd/a8gN5Tu8jxxHquab2dd2KtpOD+QOTkC8jWWGCRAqbLEO+WusX8dYPWYq3U13VqfDK9tpijntylsMiLrlmWkoETzgtKvjm8Y5FC4kOM1FXHS+9hKtSJE+dG+/8lTpA+V3VJRIBe9jAVNB4Ijl7mGHh0pqBFsEhP08Jcb5iuKFNtFphoLWH7hEeKPlpQ77VctO6BP/7XG4tMJsxl369tAGR/hCFREch5ZN7SeQyj7o3CJw6ygI7b53+LAbOCIU7+zSqlGitxCHXaMBYFyGsSLTVipdzb0OXCtHOqjmoGtCM/eNIzoGjf7c4i3Zc2DmtTGu9YQtwfkChgt7dX4hcuP/P7ayQ7xRqg2y+p5CEQtMRAFN5YnMWitbPHWRsC1eECrGuZlSOkRLZw+YxCktOBb1llGLTI4ZYu1lEja7vEJmAQJQyiVvjtDkcR+8UkNFRa914HKSpUoLUJUK+MwliXJpLLrrKLOtvRsW9UsuaYYENDn+/CN3XqZ/yMx/d5CP4zac5P5xuBs6KTxHH1tL8V/2/8uJxyLvXwhNKKyMSnmzf4u4HU/0Q6EKVJOCc9fMSXGbo=
-    - stage: update-ui
-      if: branch = master
-      script:
-        - cd editor/ && yarn && cd ..
-        - sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
-        - CI=false yarn editor-build
-        - aws s3 sync editor/build/ s3://mdocr.loopingz.com/

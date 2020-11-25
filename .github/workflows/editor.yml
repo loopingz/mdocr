@@ -1,0 +1,31 @@
+name: "Editor"
+
+on:
+  push:
+    branches: [main]
+    paths:
+     - 'editor/**'
+     - '.github/workflows/editor.yml'
+
+jobs:
+  deploy:
+    name: Deploy editor
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set committer
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+      - name: Build project
+        run: |
+          cd editor/ && yarn && cd ..
+          sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
+          CI=false yarn editor-publish
+
+
+
