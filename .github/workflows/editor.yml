@@ -23,6 +23,7 @@ jobs:
 
       - name: Build editor and publish
         run: |
+          yarn
           cd editor/ && yarn && cd ..
           sed -i "s/#COMMIT#/`git rev-parse HEAD`/g" editor/src/App.js
           CI=false yarn editor-publish
