@@ -1,4 +1,4 @@
-name: "Editor"
+name: "Editor update"
 
 on:
   push:
